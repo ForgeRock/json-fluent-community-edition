@@ -40,10 +40,18 @@ public class JsonNode {
     protected final JsonPath path;
 
     /**
-     * Constructs an value with a given path.
+     * Constructs a root JSON node with a given value. A root node has a path of {@code "$"}.
+     */
+    public JsonNode(Object value) {
+        this.value = value;
+        this.path = JsonPath.ROOT;
+    }
+
+    /**
+     * Constructs a JSON node with given value and path.
      *
      * @param value the value being wrapped.
-     * @param path the path of the value in the JSON object model structure.
+     * @param path the path to assign this node in a JSON object model structure.
      */
     public JsonNode(Object value, JsonPath path) {
         this.value = value;
@@ -373,7 +381,7 @@ public class JsonNode {
             required().asMap().put((String)key, value);
         }
         else if (key instanceof Integer) {
-            List list = required().asList();
+            List<Object> list = required().asList();
             int index = ((Integer)key).intValue();
             if (index > list.size()) {
                 throw new JsonNodeException(this, "cannot sparsely allocate list element");

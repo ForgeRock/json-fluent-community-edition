@@ -138,12 +138,13 @@ public class JsonPathTest {
     // ----- manipulation unit tests ----------
 
     @Test
+    @SuppressWarnings("unchecked")
     public void getProperty() throws JsonNodeException, JsonPathException {
-        Map r = root.asMap();
+        Map<String, Object> r = root.asMap();
         r.put("x", new HashMap());
-        Map x = (Map)r.get("x");
+        Map<String, Object> x = (Map)r.get("x");
         x.put("y", new HashMap());
-        Map y = (Map)x.get("y");
+        Map<String, Object> y = (Map)x.get("y");
         y.put("z", "foo");
         JsonPath path = new JsonPath("$.x.y.z");
         assertThat(path.get(root).asString()).isEqualTo("foo");

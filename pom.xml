@@ -19,7 +19,7 @@
     <parent>
         <groupId>org.forgerock</groupId>
         <artifactId>forgerock-parent</artifactId>
-        <version>1-SNAPSHOT</version>
+        <version>1.0.0-SNAPSHOT</version>
     </parent>
     <groupId>org.forgerock.commons</groupId>
     <artifactId>json-fluent</artifactId>
@@ -67,13 +67,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
-                <configuration>
-                    <author>false</author>
-                    <!--bottom>Copyright &copy; 2011 ForgeRock AS. All rights reserved.</bottom-->
-                    <links>
-                        <link>http://java.sun.com/javase/6/docs/api/</link>
-                    </links>
-                </configuration>
                 <executions>
                     <execution>
                         <id>attach-javadocs</id>
@@ -82,6 +75,11 @@
                         </goals>
                     </execution>
                 </executions>
+                <configuration>
+                    <links>
+                        <link>http://download.oracle.com/javase/1.5.0/docs/api/</link>
+                    </links>
+                </configuration>
             </plugin>
         </plugins>
     </build>

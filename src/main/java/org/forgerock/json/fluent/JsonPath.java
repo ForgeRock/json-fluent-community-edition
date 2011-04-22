@@ -37,8 +37,18 @@ import javax.lang.model.SourceVersion;
  */
 public class JsonPath {
 
+    /** A concrete root {@code "$"} JSON path. */
+    public static final JsonPath ROOT = new JsonPath();
+
     /** The concrete elements of the path. */
     private ArrayList<Object> elements = new ArrayList<Object>();
+
+    /**
+     * Constructs a root JSON path.
+     */
+    private JsonPath() {
+        // root by virtue of being empty
+    }
 
     /**
      * Constructs a JSON path from a string.
@@ -108,7 +118,7 @@ public class JsonPath {
             throw new JsonPathException("illegal subscript", path, index);
         }
         char c = path.charAt(cursor);
-        if (c == '\'' || c == '"') { // allows double quotation marks 
+        if (c == '\'' || c == '"') { // allows single or double quotation marks 
             return parseQuotedSubscript(path, cursor) + 1; // add left square bracket
         }
         else {
@@ -205,7 +215,7 @@ public class JsonPath {
             if (cp == '.' || cp == '[') {
                 break;
             }
-            sb.appendCodePoint(cp); // a forgiving identifier parser
+            sb.appendCodePoint(cp); // yes, a forgiving identifier parser
             cursor += Character.charCount(cp);
         }
         if (sb.length() == 0) {
