@@ -22,7 +22,7 @@ package org.forgerock.json.fluent;
  *
  * @author Paul C. Bryan
  */
-public class JsonNodeException extends RuntimeException {
+public class JsonNodeException extends Exception {
 
     /** Serializable class a version number. */
     static final long serialVersionUID = 1L;
