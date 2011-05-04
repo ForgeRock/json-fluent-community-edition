@@ -31,7 +31,7 @@ import java.util.Set;
  *
  * @author Paul C. Bryan
  */
-public class JsonNode {
+public class JsonNode implements Iterable<JsonNode> {
 
     /** The value being wrapped by the node. */
     protected final Object value;
@@ -457,5 +457,42 @@ public class JsonNode {
         else {
             return Collections.emptySet();
         }
+    }
+
+    /**
+     * Returns an iterator the child nodes this node contains.
+     */
+    @Override
+    public Iterator<JsonNode> iterator() {
+        return new Iterator<JsonNode>() {
+            Iterator<? extends Object> keys = keys().iterator();
+            Object key = null; // last key retrieved
+            @Override public boolean hasNext() {
+                return keys.hasNext();
+            }
+            @Override public JsonNode next() {
+                try {
+                    key = keys.next();
+                    return get(key);
+                }
+                catch (JsonNodeException jne) { // shouldn't happen
+                    throw new IllegalStateException(jne);
+                }
+            }
+            @Override public void remove() {
+                if (key == null) {
+                    throw new IllegalStateException();
+                }
+                else {
+                    try {
+                        JsonNode.this.remove(key);
+                        key = null; // throw exception if called without next()
+                    }
+                    catch (JsonNodeException jne) {
+                        throw new UnsupportedOperationException(jne);
+                    }
+                }
+            }
+        };
     }
 }
