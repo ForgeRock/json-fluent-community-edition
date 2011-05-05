@@ -351,19 +351,22 @@ public class JsonNode implements Iterable<JsonNode> {
      */
     public JsonNode get(Object key) throws JsonNodeException {
         if (key instanceof String) {
-            return new JsonNode(required().asMap().get((String)key), new JsonPath(path, (String)key));
+            return new JsonNode(isMap() ? asMap().get((String)key) : null,
+             new JsonPath(path, (String)key));
         }
         else if (key instanceof Integer) {
-            List list = required().asList();
             Object o = null;
-            int index = ((Integer)key).intValue();
-            if (list.size() > index) {
-                o = list.get(index);
+            if (isList()) {
+                List list = asList();
+                int index = ((Integer)key).intValue();
+                if (list.size() > index) {
+                    o = list.get(index);
+                }
             }
             return new JsonNode(o, new JsonPath(path, (Integer)key));
         }
         else {
-            throw new JsonNodeException(this, "unknown key type");
+            throw new JsonNodeException(this, "unexpected key type");
         }
     }
 
@@ -394,7 +397,7 @@ public class JsonNode implements Iterable<JsonNode> {
             }
         }
         else {
-            throw new JsonNodeException(this, "unknown key type");
+            throw new JsonNodeException(this, "unexpected key type");
         }
     }
 
@@ -418,7 +421,19 @@ public class JsonNode implements Iterable<JsonNode> {
             }
         }
         else {
-            throw new JsonNodeException(this, "unknown key type");
+            throw new JsonNodeException(this, "unexpected key type");
+        }
+    }
+
+    /**
+     * Removes all of the child nodes from this node, if it has any.
+     */
+    public void clear() throws JsonNodeException {
+        if (isMap()) {
+            asMap().clear();
+        }
+        else if (isList()) {
+            asList().clear();
         }
     }
 
