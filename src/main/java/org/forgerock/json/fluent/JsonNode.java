@@ -18,7 +18,9 @@
 package org.forgerock.json.fluent;
 
 // Java Standard Edition
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -509,5 +511,28 @@ public class JsonNode implements Iterable<JsonNode> {
                 }
             }
         };
+    }
+
+    /**
+     * TODO: Description.
+     */
+    public JsonNode copy() {
+        Object result = this.value; // default: shallow copy of value
+        int size = size();
+        if (isMap()) {
+            HashMap map = new HashMap<Object, Object>(size);
+            for (Object key : keys()) {
+                map.put(key, get(key).copy().value); // recursive
+            }
+            result = map;
+        }
+        else if (isList()) {
+            ArrayList list = new ArrayList<Object>(size);
+            for (int n = 0; n < size; n++) {
+                list.add(get(n).copy().value); // recursive
+            }
+            result = list;
+        }
+        return new JsonNode(result, getPath());
     }
 }
