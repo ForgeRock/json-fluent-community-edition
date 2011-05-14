@@ -251,8 +251,7 @@ public class JsonNode implements Iterable<JsonNode> {
         }
         try {
             return (value == null ? null : Enum.valueOf(type, asString().toUpperCase()));
-        }
-        catch (IllegalArgumentException iae) {
+        } catch (IllegalArgumentException iae) {
             StringBuilder sb = new StringBuilder("Expecting one of:");
             for (Object constant : type.getEnumConstants()) {
                 sb.append(constant.toString()).append(' ');
@@ -333,11 +332,9 @@ public class JsonNode implements Iterable<JsonNode> {
     public boolean isDefined(Object key) {
         if (key instanceof String) {
             return (isMap() && ((Map)value).containsKey((String)key));
-        }
-        else if (key instanceof Integer) {
+        } else if (key instanceof Integer) {
             return (isList() && ((List)value).size() > ((Integer)key).intValue());
-        }
-        else {
+        } else {
             return false; // unknown key type
         }
     }
@@ -355,8 +352,7 @@ public class JsonNode implements Iterable<JsonNode> {
         if (key instanceof String) {
             return new JsonNode(isMap() ? asMap().get((String)key) : null,
              new JsonPath(path, (String)key));
-        }
-        else if (key instanceof Integer) {
+        } else if (key instanceof Integer) {
             Object o = null;
             if (isList()) {
                 List list = asList();
@@ -366,8 +362,7 @@ public class JsonNode implements Iterable<JsonNode> {
                 }
             }
             return new JsonNode(o, new JsonPath(path, (Integer)key));
-        }
-        else {
+        } else {
             throw new JsonNodeException(this, "unexpected key type");
         }
     }
@@ -384,21 +379,17 @@ public class JsonNode implements Iterable<JsonNode> {
     public void put(Object key, Object value) throws JsonNodeException {
         if (key instanceof String) {
             required().asMap().put((String)key, value);
-        }
-        else if (key instanceof Integer) {
+        } else if (key instanceof Integer) {
             List<Object> list = required().asList();
             int index = ((Integer)key).intValue();
             if (index > list.size()) {
                 throw new JsonNodeException(this, "cannot sparsely allocate list element");
-            }
-            else if (index == list.size()) { // appending to end of list
+            } else if (index == list.size()) { // appending to end of list
                 list.add(value);
-            }
-            else { // replacing existing element
+            } else { // replacing existing element
                 list.set(index, value);
             }
-        }
-        else {
+        } else {
             throw new JsonNodeException(this, "unexpected key type");
         }
     }
@@ -414,15 +405,13 @@ public class JsonNode implements Iterable<JsonNode> {
     public void remove(Object key) throws JsonNodeException {
         if (key instanceof String) {
             required().asMap().remove(key);
-        }
-        else if (key instanceof Integer) {
+        } else if (key instanceof Integer) {
             int index = ((Integer)key).intValue();
             List list = required().asList();
             if (list.size() > index) {
                 list.remove(index);
             }
-        }
-        else {
+        } else {
             throw new JsonNodeException(this, "unexpected key type");
         }
     }
@@ -433,8 +422,7 @@ public class JsonNode implements Iterable<JsonNode> {
     public void clear() throws JsonNodeException {
         if (isMap()) {
             asMap().clear();
-        }
-        else if (isList()) {
+        } else if (isList()) {
             asList().clear();
         }
     }
@@ -445,11 +433,9 @@ public class JsonNode implements Iterable<JsonNode> {
     public int size() {
         if (isMap()) {
             return ((Map)value).size();
-        }
-        else if (isList()) {
+        } else if (isList()) {
             return ((List)value).size();
-        }
-        else {
+        } else {
             return 0;
         }
     }
@@ -467,11 +453,9 @@ public class JsonNode implements Iterable<JsonNode> {
                 }
             }
             return set;
-        }
-        else if (isList()) {
-            return new RangeSet(0, ((List)value).size() - 1);
-        }
-        else {
+        } else if (isList() && size() > 0) {
+            return new RangeSet(0, size() - 1);
+        } else {
             return Collections.emptySet();
         }
     }
@@ -491,21 +475,18 @@ public class JsonNode implements Iterable<JsonNode> {
                 try {
                     key = keys.next();
                     return get(key);
-                }
-                catch (JsonNodeException jne) { // shouldn't happen
+                } catch (JsonNodeException jne) { // shouldn't happen
                     throw new IllegalStateException(jne);
                 }
             }
             @Override public void remove() {
                 if (key == null) {
                     throw new IllegalStateException();
-                }
-                else {
+                } else {
                     try {
                         JsonNode.this.remove(key);
                         key = null; // throw exception if called without next()
-                    }
-                    catch (JsonNodeException jne) {
+                    } catch (JsonNodeException jne) {
                         throw new UnsupportedOperationException(jne);
                     }
                 }
@@ -525,8 +506,7 @@ public class JsonNode implements Iterable<JsonNode> {
                 map.put(key, get(key).copy().value); // recursive
             }
             result = map;
-        }
-        else if (isList()) {
+        } else if (isList()) {
             ArrayList list = new ArrayList<Object>(size);
             for (int n = 0; n < size; n++) {
                 list.add(get(n).copy().value); // recursive

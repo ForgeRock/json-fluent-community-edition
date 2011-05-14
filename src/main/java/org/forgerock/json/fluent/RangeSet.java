@@ -20,6 +20,7 @@ package org.forgerock.json.fluent;
 import java.io.Serializable;
 import java.util.AbstractSet;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.Set;
 
 /**
@@ -63,6 +64,9 @@ class RangeSet extends AbstractSet<Integer> implements Set<Integer>, Cloneable, 
                 return cursor <= end;
             }
             public Integer next() {
+                if (cursor > end) {
+                    throw new NoSuchElementException();
+                }
                 return Integer.valueOf(cursor++);
             }
             public void remove() {
