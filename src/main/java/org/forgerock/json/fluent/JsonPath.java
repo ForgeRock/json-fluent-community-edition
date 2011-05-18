@@ -293,7 +293,7 @@ public class JsonPath {
         }
         JsonNode parent = parentNode(root);
         Object key = elements.get(elements.size() - 1);
-        return (parent.isDefined(key) ? parent.get(key) : new JsonNode(null));
+        return (parent.isDefined(key) ? parent.get(key) : null);
     }
 
     /**
