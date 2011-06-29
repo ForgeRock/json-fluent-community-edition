@@ -18,11 +18,11 @@
 package org.forgerock.json.fluent;
 
 /**
- * An exception that is thrown during node operations.
+ * An exception that is thrown during JSON node operations.
  *
  * @author Paul C. Bryan
  */
-public class JsonNodeException extends RuntimeException {
+public class JsonNodeException extends JsonException {
 
     /** Serializable class a version number. */
     static final long serialVersionUID = 1L;
@@ -71,7 +71,7 @@ public class JsonNodeException extends RuntimeException {
         StringBuilder sb = new StringBuilder();
         String message = super.getMessage();
         if (node != null) {
-            sb.append(node.path.toString());
+            sb.append(node.pointer.toString());
         }
         if (node != null && message != null) {
             sb.append(": ");

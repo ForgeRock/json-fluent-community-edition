@@ -29,8 +29,9 @@ import java.util.Set;
  *
  * @author Paul C. Bryan
  */
-class RangeSet extends AbstractSet<Integer> implements Set<Integer>, Cloneable, Serializable {
+class RangeSet extends AbstractSet<String> implements Set<String>, Cloneable, Serializable {
 
+    /** TODO: Description. */
     static final long serialVersionUID = 1L;
 
     /** The start of the range, inclusive. */
@@ -57,19 +58,19 @@ class RangeSet extends AbstractSet<Integer> implements Set<Integer>, Cloneable, 
      * Returns an iterator over the elements in this set.
      */
     @Override
-    public Iterator<Integer> iterator() {
-        return new Iterator<Integer>() {
+    public Iterator<String> iterator() {
+        return new Iterator<String>() {
             int cursor = start;
-            public boolean hasNext() {
+            @Override public boolean hasNext() {
                 return cursor <= end;
             }
-            public Integer next() {
+            @Override public String next() {
                 if (cursor > end) {
                     throw new NoSuchElementException();
                 }
-                return Integer.valueOf(cursor++);
+                return Integer.toString(cursor++);
             }
-            public void remove() {
+            @Override public void remove() {
                 throw new UnsupportedOperationException();
             }
         };
@@ -96,11 +97,16 @@ class RangeSet extends AbstractSet<Integer> implements Set<Integer>, Cloneable, 
      */
     @Override
     public boolean contains(Object o) {
-        if (o != null && o instanceof Integer) {
-            int n = (((Integer)o).intValue());
-            return (n >= start && n <= end);
+        boolean result = false;
+        if (o != null && o instanceof String) {
+            try {
+                int n = Integer.parseInt((String)o);
+                result = (n >= start && n <= end);
+            } catch (NumberFormatException nfe) {
+                // result remains false
+            }
         }
-        return false;
+        return result;
     }
 
     /**
@@ -108,7 +114,7 @@ class RangeSet extends AbstractSet<Integer> implements Set<Integer>, Cloneable, 
      * immutable.
      */
     @Override
-    public boolean add(Integer e) {
+    public boolean add(String e) {
         throw new UnsupportedOperationException();
     }
 

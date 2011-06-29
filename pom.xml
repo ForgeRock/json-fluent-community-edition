@@ -24,8 +24,8 @@
     <groupId>org.forgerock.commons</groupId>
     <artifactId>json-fluent</artifactId>
     <version>1.0.0-SNAPSHOT</version>
-    <name>ForgeRock JSON-Fluent library</name>
-    <description>ForgeRock JSON-Fluent library</description>
+    <name>JSON Fluent</name>
+    <description>ForgeRock JSON Fluent library</description>
     <packaging>bundle</packaging>
     <dependencies>
         <dependency>
