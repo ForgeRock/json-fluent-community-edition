@@ -78,10 +78,8 @@ public class JsonPointerTest {
         list.add("a");
         list.add("b");
         list.add("c");
-        JsonPointer p1 = new JsonPointer("/0003");
-        JsonPointer p2 = new JsonPointer("/3");
-        listNode.put(p1, "d");
-        assertThat(listNode.get(p2).asString()).isEqualTo("d");
+        listNode.put(3, "d");
+        assertThat(listNode.get(new JsonPointer("/0003")).asString()).isEqualTo("d");
     }
 
     @Test
@@ -117,51 +115,26 @@ public class JsonPointerTest {
     }
 
     @Test
-    public void putProperty() {
-        mapNode.put(new JsonPointer("/a/b/c"), "d");
-        assertThat(mapNode.get("a").get("b").get("c").asString()).isEqualTo("d");
+    public void array() {
+        listNode.put(0, "x");
+        listNode.put(1, "y");
+        assertThat(listNode.get(new JsonPointer("/0")).getValue()).isEqualTo("x");
+        assertThat(listNode.get(new JsonPointer("/1")).getValue()).isEqualTo("y");
     }
 
     @Test
-    public void deepRemoveProperty() {
-        JsonPointer pointer = new JsonPointer("/a/b/c");
-        mapNode.put(pointer, "d");
-        mapNode.remove(pointer);
-        assertThat(mapNode.get("a").isDefined("b")).isTrue();
-        assertThat(mapNode.get(new JsonPointer("/a/b")).isDefined("c")).isFalse();
-    }
-
-    @Test
-    public void shallowRemoveProperty() {
-        mapNode.put(new JsonPointer("/a/b/c/d/e"), "f");
-        mapNode.remove(new JsonPointer("/a/b/c"));
-        assertThat(mapNode.get(new JsonPointer("/a/b")).isMap()).isTrue();
-        assertThat(mapNode.get(new JsonPointer("/a/b")).isDefined("c")).isFalse();
-    }
-
-    @Test
-    public void putArray() {
-        listNode.put(new JsonPointer("/0"), "x");
-        listNode.put(new JsonPointer("/1"), "y");
-        assertThat(listNode.get(0).asString()).isEqualTo("x");
-        assertThat(listNode.get(1).asString()).isEqualTo("y");
-    }
-
-    @Test
-    public void multidimensionalArrays() {
+    public void multiDimensionalArray() {
         mapNode.put("a", new ArrayList<Object>());
-        mapNode.put(new JsonPointer("/a/0"), new ArrayList<Object>());
-        mapNode.put(new JsonPointer("/a/1"), new ArrayList<Object>());
-        mapNode.put(new JsonPointer("/a/0/0"), "a00");
-        mapNode.put(new JsonPointer("/a/0/1"), "a01");
-        mapNode.put(new JsonPointer("/a/1/0"), "a10");
-        mapNode.put(new JsonPointer("/a/1/1"), "a11");
-        List a0 = mapNode.get("a").get(0).asList();
-        assertThat(a0.get(0)).isEqualTo("a00");
-        assertThat(a0.get(1)).isEqualTo("a01");
-        List a1 = mapNode.get("a").get(1).asList();
-        assertThat(a1.get(0)).isEqualTo("a10");
-        assertThat(a1.get(1)).isEqualTo("a11");
+        mapNode.get("a").put(0, new ArrayList<Object>());
+        mapNode.get("a").get(0).put(0, "a00");
+        mapNode.get("a").get(0).put(1, "a01");
+        mapNode.get("a").put(1, new ArrayList<Object>());
+        mapNode.get("a").get(1).put(0, "a10");
+        mapNode.get("a").get(1).put(1, "a11");
+        assertThat(mapNode.get(new JsonPointer("/a/0/0")).getValue()).isEqualTo("a00");
+        assertThat(mapNode.get(new JsonPointer("/a/0/1")).getValue()).isEqualTo("a01");
+        assertThat(mapNode.get(new JsonPointer("/a/1/0")).getValue()).isEqualTo("a10");
+        assertThat(mapNode.get(new JsonPointer("/a/1/1")).getValue()).isEqualTo("a11");
     }
 
     // ----- exception unit tests ----------
@@ -169,20 +142,5 @@ public class JsonPointerTest {
     @Test(expectedExceptions=JsonException.class)
     public void uriSyntaxException() throws JsonException {
         new JsonPointer("%%%");
-    }
-
-    @Test(expectedExceptions=JsonNodeException.class)
-    public void putRoot() throws JsonNodeException {
-        mapNode.put(new JsonPointer(), "foo");
-    }
-
-    @Test(expectedExceptions=JsonNodeException.class)
-    public void removeRoot() throws JsonNodeException {
-        mapNode.remove(new JsonPointer());
-    }
-
-    @Test(expectedExceptions=JsonNodeException.class)
-    public void sparseAllocation() throws JsonNodeException {
-        listNode.put(new JsonPointer("/2"), "i feel sparse");
     }
 }
