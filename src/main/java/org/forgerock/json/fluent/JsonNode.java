@@ -14,7 +14,6 @@
  * Copyright © 2010–2011 ApexIdentity Inc. All rights reserved.
  * Portions Copyrighted 2011 ForgeRock AS.
  */
-
 package org.forgerock.json.fluent;
 
 // Java Standard Edition
@@ -37,7 +36,6 @@ public class JsonNode implements Iterable<JsonNode> {
 
     /** The pointer to the node within the object model structure. */
     protected final JsonPointer pointer;
-
     /** The value being wrapped by the node. */
     protected Object value;
 
@@ -128,7 +126,7 @@ public class JsonNode implements Iterable<JsonNode> {
      */
     @SuppressWarnings("unchecked")
     public Map<String, Object> asMap() throws JsonNodeException {
-        return (value == null ? null : ((Map)expect(Map.class).value));
+        return (value == null ? null : ((Map) expect(Map.class).value));
     }
 
     /**
@@ -147,7 +145,7 @@ public class JsonNode implements Iterable<JsonNode> {
      */
     @SuppressWarnings("unchecked")
     public List<Object> asList() throws JsonNodeException {
-        return (value == null ? null : ((List)expect(List.class).value));
+        return (value == null ? null : ((List) expect(List.class).value));
     }
 
     /**
@@ -165,7 +163,7 @@ public class JsonNode implements Iterable<JsonNode> {
      * @throws JsonNodeException if the node value is not a string.
      */
     public String asString() throws JsonNodeException {
-        return (value == null ? null : ((String)expect(String.class).value));
+        return (value == null ? null : ((String) expect(String.class).value));
     }
 
     /**
@@ -183,7 +181,7 @@ public class JsonNode implements Iterable<JsonNode> {
      * @throws JsonNodeException if the node value is not a number.
      */
     public Number asNumber() throws JsonNodeException {
-        return (value == null ? null : (Number)expect(Number.class).value);
+        return (value == null ? null : (Number) expect(Number.class).value);
     }
 
     /**
@@ -234,7 +232,7 @@ public class JsonNode implements Iterable<JsonNode> {
      * @throws JsonNodeException if the node value is not a boolean type.
      */
     public Boolean asBoolean() throws JsonNodeException {
-        return (value == null ? null : (Boolean)expect(Boolean.class).value);
+        return (value == null ? null : (Boolean) expect(Boolean.class).value);
     }
 
     /**
@@ -319,10 +317,10 @@ public class JsonNode implements Iterable<JsonNode> {
      */
     public boolean isDefined(String key) {
         if (isMap()) {
-            return ((Map)value).containsKey(key);
+            return ((Map) value).containsKey(key);
         } else if (isList()) {
             int index = toIndex(key);
-            return (index >= 0 && index < ((List)value).size());
+            return (index >= 0 && index < ((List) value).size());
         } else {
             return false;
         }
@@ -338,9 +336,9 @@ public class JsonNode implements Iterable<JsonNode> {
     public JsonNode get(String key) {
         Object result = null;
         if (isMap()) {
-            result = ((Map)value).get(key);
+            result = ((Map) value).get(key);
         } else if (isList()) {
-            List list = (List)value;
+            List list = (List) value;
             int index = toIndex(key);
             if (index >= 0 && index < list.size()) {
                 result = list.get(index);
@@ -363,14 +361,14 @@ public class JsonNode implements Iterable<JsonNode> {
         }
         Object child = null;
         if (isList()) {
-            List list = (List)value;
+            List list = (List) value;
             if (index < list.size()) {
                 child = list.get(index);
             }
         }
         return new JsonNode(child, pointer.child(index));
     }
-     
+
     /**
      * Returns the specified child node. If the specified child does not exist, then
      * {@code null} is returned.
@@ -381,6 +379,9 @@ public class JsonNode implements Iterable<JsonNode> {
     public JsonNode get(JsonPointer pointer) {
         JsonNode node = this;
         for (String token : pointer) {
+            if ("".equals(token)) {
+                return node;// pointer is "/" pointing to the entire object
+            }
             JsonNode child = node.get(token);
             if (child.isNull() && !node.isDefined(token)) {
                 return null; // undefined node yields a null value, not an empty node
@@ -439,7 +440,7 @@ public class JsonNode implements Iterable<JsonNode> {
      */
     public void remove(String key) {
         if (isMap()) {
-            ((Map)value).remove(key);
+            ((Map) value).remove(key);
         } else if (isList()) {
             remove(toIndex(key));
         }
@@ -452,7 +453,7 @@ public class JsonNode implements Iterable<JsonNode> {
      */
     public void remove(int index) {
         if (index >= 0 && isList()) {
-            List list = (List)value;
+            List list = (List) value;
             if (index < list.size()) {
                 list.remove(index);
             }
@@ -514,9 +515,9 @@ public class JsonNode implements Iterable<JsonNode> {
      */
     public int size() {
         if (isMap()) {
-            return ((Map)value).size();
+            return ((Map) value).size();
         } else if (isList()) {
-            return ((List)value).size();
+            return ((List) value).size();
         } else {
             return 0;
         }
@@ -530,9 +531,9 @@ public class JsonNode implements Iterable<JsonNode> {
         Set<String> result;
         if (isMap()) {
             result = new HashSet<String>();
-            for (Object key : ((Map)value).keySet()) {
+            for (Object key : ((Map) value).keySet()) {
                 if (key instanceof String) {
-                    result.add((String)key); // only expose string keys in map
+                    result.add((String) key); // only expose string keys in map
                 }
             }
         } else if (isList() && size() > 0) {
@@ -551,29 +552,43 @@ public class JsonNode implements Iterable<JsonNode> {
     public Iterator<JsonNode> iterator() {
         if (isList()) { // optimize for list
             return new Iterator<JsonNode>() {
+
                 int cursor = 0;
-                Iterator<Object> i = ((List)value).iterator();
-                @Override public boolean hasNext() {
+                Iterator<Object> i = ((List) value).iterator();
+
+                @Override
+                public boolean hasNext() {
                     return i.hasNext();
                 }
-                @Override public JsonNode next() {
+
+                @Override
+                public JsonNode next() {
                     Object element = i.next();
                     return new JsonNode(element, pointer.child(cursor++));
                 }
-                @Override public void remove() {
+
+                @Override
+                public void remove() {
                     throw new UnsupportedOperationException();
                 }
             };
         } else {
             return new Iterator<JsonNode>() {
+
                 Iterator<String> i = keys().iterator();
-                @Override public boolean hasNext() {
+
+                @Override
+                public boolean hasNext() {
                     return i.hasNext();
                 }
-                @Override public JsonNode next() {
+
+                @Override
+                public JsonNode next() {
                     return get(i.next());
                 }
-                @Override public void remove() {
+
+                @Override
+                public void remove() {
                     throw new UnsupportedOperationException();
                 }
             };
@@ -590,7 +605,7 @@ public class JsonNode implements Iterable<JsonNode> {
     private static Object copy(Object value) {
         Object result = value; // default: shallow copy of value
         if (value instanceof Map) {
-            Map map = ((Map)value);
+            Map map = ((Map) value);
             HashMap copy = new HashMap(map.size());
             for (Object key : map.keySet()) {
                 if (key instanceof String) {
@@ -599,7 +614,7 @@ public class JsonNode implements Iterable<JsonNode> {
             }
             result = copy;
         } else if (value instanceof List) {
-            List list = ((List)value);
+            List list = ((List) value);
             ArrayList copy = new ArrayList(list.size());
             for (Object element : list) {
                 copy.add(copy(element)); // recursive
