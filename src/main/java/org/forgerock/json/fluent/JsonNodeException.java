@@ -71,7 +71,7 @@ public class JsonNodeException extends JsonException {
         StringBuilder sb = new StringBuilder();
         String message = super.getMessage();
         if (node != null) {
-            sb.append(node.pointer.toString());
+            sb.append(node.getPointer().toString());
         }
         if (node != null && message != null) {
             sb.append(": ");
