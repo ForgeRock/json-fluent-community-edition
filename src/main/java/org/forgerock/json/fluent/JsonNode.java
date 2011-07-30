@@ -83,9 +83,11 @@ public class JsonNode implements Iterable<JsonNode> {
 
     /**
      * Constructs a root JSON node with a given value.
+     *
+     * @param value the value being wrapped.
      */
     public JsonNode(Object value) {
-        this(value, null);
+        this(value, null, null);
     }
 
     /**
