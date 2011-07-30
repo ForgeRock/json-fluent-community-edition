@@ -47,8 +47,9 @@ public class JsonNode implements Iterable<JsonNode> {
     /**
      * Constructs a JSON node with given value, pointer and transformers.
      * <p>
-     * Transformers are applied to the node upon construction, in the order specified in the
-     * list. Transformers are inherited by and applied to the node's children.
+     * Transformations are applied to the node value, by the transformers in the order
+     * specified in the list. Transformers are inherited by the node's children and are
+     * applied upon construction of such child nodes.
      *
      * @param value the value being wrapped.
      * @param pointer the pointer to assign this node in a JSON object model structure.
@@ -65,7 +66,7 @@ public class JsonNode implements Iterable<JsonNode> {
         this.value = value;
         this.pointer = pointer;
         this.transformers = new ArrayList<JsonTransformer>(transformers);
-        for (JsonTransformer transformer : transformers) { // apply transformers in specified order
+        for (JsonTransformer transformer : transformers) { // apply transformations in specified order
             this.value = transformer.transform(this);
         }
     }
