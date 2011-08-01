@@ -54,9 +54,9 @@ public class JsonNode implements Iterable<JsonNode> {
      * @param value the value being wrapped.
      * @param pointer the pointer to assign this node in a JSON object model structure.
      * @param transformers a list of transformers to apply to node values.
-     * @throws JsonNodeException if a transformer failed during node initialization.
+     * @throws JsonException if a transformer failed during node initialization.
      */
-    public JsonNode(Object value, JsonPointer pointer, List<JsonTransformer> transformers) throws JsonNodeException {
+    public JsonNode(Object value, JsonPointer pointer, List<JsonTransformer> transformers) throws JsonException {
         if (pointer == null) {
             pointer = new JsonPointer();
         }
@@ -66,9 +66,7 @@ public class JsonNode implements Iterable<JsonNode> {
         this.value = value;
         this.pointer = pointer;
         this.transformers = new ArrayList<JsonTransformer>(transformers);
-        for (JsonTransformer transformer : transformers) { // apply transformations in specified order
-            this.value = transformer.transform(this);
-        }
+        transform(); // recursively apply transformations
     }
 
     /**
@@ -88,6 +86,23 @@ public class JsonNode implements Iterable<JsonNode> {
      */
     public JsonNode(Object value) {
         this(value, null, null);
+    }
+
+    /**
+     * TODO: Description.
+     *
+     * @throws JsonException if a transformer failed to perform a transformation.
+     */
+    private void transform() throws JsonException {
+        for (JsonTransformer transformer : transformers) { 
+            JsonNode node = new JsonNode(this.value, this.pointer); // no not inherit transformers
+            transformer.transform(node);
+            if (this.value != node.value || (this.value != null && !this.value.equals(node.value))) {
+                this.value = node.value; // transformation occurred; use new value
+                transform(); // recursively iterate through all transformers using new value
+                break; // recursive call handled remaining transformations in list
+            }
+        }
     }
 
     /**
@@ -372,9 +387,9 @@ public class JsonNode implements Iterable<JsonNode> {
      *
      * @param key property or element identifying the child node to return.
      * @return the child node, or a node with {@code null} value.
-     * @throws JsonNodeException if a transformer failed during node initialization.
+     * @throws JsonException if a transformer failed during node initialization.
      */
-    public JsonNode get(String key) throws JsonNodeException {
+    public JsonNode get(String key) throws JsonException {
         Object result = null;
         if (isMap()) {
             result = ((Map)value).get(key);
@@ -395,9 +410,9 @@ public class JsonNode implements Iterable<JsonNode> {
      * @param index element identifying the child node to return.
      * @return the child node, or a node with {@code null} value.
      * @throws IndexOutOfBoundsException if {@code index < 0}.
-     * @throws JsonNodeException if a transformer failed during node initialization.
+     * @throws JsonException if a transformer failed during node initialization.
      */
-    public JsonNode get(int index) throws JsonNodeException {
+    public JsonNode get(int index) throws JsonException {
         if (index < 0) {
             throw new IndexOutOfBoundsException();
         }
@@ -417,9 +432,9 @@ public class JsonNode implements Iterable<JsonNode> {
      *
      * @param pointer the JSON pointer identifying the child node to return.
      * @return the child node, or {@code null} if no such child exists.
-     * @throws JsonNodeException if a transformer failed during node initialization.
+     * @throws JsonException if a transformer failed during node initialization.
      */
-    public JsonNode get(JsonPointer pointer) throws JsonNodeException {
+    public JsonNode get(JsonPointer pointer) throws JsonException {
         JsonNode node = this;
         for (String token : pointer) {
             JsonNode child = node.get(token);
@@ -501,11 +516,11 @@ public class JsonNode implements Iterable<JsonNode> {
     }
 
     /**
-     * TODO: Description.
+     * Adds the specified child node value.
      *
-     * @param key TODO.
-     * @param value TODO.
-     * @throws JsonNodeException TODO.
+     * @param key the child node to add.
+     * @param value the value to apply to the new child node.
+     * @throws JsonNodeException if the child already exists or if this node cannot have children.
      */
     public void add(String key, Object value) throws JsonNodeException {
         if (isMap()) {
@@ -521,11 +536,12 @@ public class JsonNode implements Iterable<JsonNode> {
     }
 
     /**
-     * TODO: Description.
+     * Adds the specified child node value to the list. Adding a node to a list shifts any
+     * existing elements at or above the index to the right by one.
      *
-     * @param index TODO.
-     * @param value TODO.
-     * @throws JsonNodeException TODO.
+     * @param index index of the child node to add.
+     * @param value the value to apply to the new child node.
+     * @throws JsonNodeException if the child index is out of range.
      */
     public void add(int index, Object value) throws JsonNodeException {
         if (!isList()) {

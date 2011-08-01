@@ -17,20 +17,19 @@
 package org.forgerock.json.fluent;
 
 /**
- * Interface for transforming a JSON node from one value to another. Applied during the
- * construction of a JSON node, and is inherited by child nodes.
+ * Interface for transforming the value of JSON nodes. Applied during the construction of a
+ * JSON node, and is inherited (and applied) by its child nodes.
  *
  * @author Paul C. Bryan
  */
 public interface JsonTransformer {
 
     /**
-     * Transforms the value of the specified JSON node. If a transformation is not applicable,
-     * then this method return the node's value untransformed.
+     * Performs the transformation of the specified JSON node. If a transformation is not
+     * applicable, then this method <strong>must not</strong> modify the node's value.
      *
-     * @param source the JSON node containing the value to be transformed.
-     * @return the transformed value (or untransformed if not applicable).
-     * @throws JsonNodeException if an exception occured applying the transformation.
+     * @param node the JSON node containing the value to be transformed.
+     * @throws JsonException if an exception occured applying the transformation.
      */
-    Object transform(JsonNode source) throws JsonNodeException;
+    void transform(JsonNode node) throws JsonException;
 }
