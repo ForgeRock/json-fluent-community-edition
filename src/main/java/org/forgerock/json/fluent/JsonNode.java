@@ -18,6 +18,8 @@
 package org.forgerock.json.fluent;
 
 // Java Standard Edition
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -318,6 +320,21 @@ public class JsonNode implements Iterable<JsonNode> {
                 sb.append(constant.toString()).append(' ');
             }
             throw new JsonNodeException(this, sb.toString());
+        }
+    }
+
+    /**
+     * Returns the node string value as a uniform resource identifier. If the node
+     * value is {@code null}, this method returns {@code null}.
+     *
+     * @return the URI represented by the string value.
+     * @throws JsonNodeException if the given string violates URI syntax.
+     */
+    public URI asURI() throws JsonNodeException {
+        try {
+            return (value == null ? null : new URI(asString()));
+        } catch (URISyntaxException use) {
+            throw new JsonNodeException(this, use);
         }
     }
 
