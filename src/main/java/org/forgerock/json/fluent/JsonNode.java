@@ -38,7 +38,7 @@ import java.util.Set;
 public class JsonNode implements Iterable<JsonNode> {
 
     /** Transformers to apply to the node, and are inherited by its children. */
-    private final ArrayList<JsonTransformer> transformers;
+    private final ArrayList<JsonTransformer> transformers = new ArrayList<JsonTransformer>();
 
     /** The pointer to the node within the object model structure. */
     private final JsonPointer pointer;
@@ -62,13 +62,12 @@ public class JsonNode implements Iterable<JsonNode> {
         if (pointer == null) {
             pointer = new JsonPointer();
         }
-        if (transformers == null) {
-            transformers = Collections.emptyList();
-        }
         this.value = value;
         this.pointer = pointer;
-        this.transformers = new ArrayList<JsonTransformer>(transformers);
-        transform(); // recursively apply transformations
+        if (transformers != null) {
+            this.transformers.addAll(transformers);
+        }
+        transform(); // apply transformations
     }
 
     /**
@@ -91,6 +90,16 @@ public class JsonNode implements Iterable<JsonNode> {
     }
 
     /**
+     * Constructs a new JSON node with the value, pointer and transformers of the specified
+     * JSON node. Transformations are not reapplied as a result of creating the new node.
+     */
+    public JsonNode(JsonNode node) {
+        this.value = node.value;
+        this.pointer = node.pointer;
+        this.transformers.addAll(node.transformers);
+    }
+
+    /**
      * TODO: Description.
      *
      * @throws JsonException if a transformer failed to perform a transformation.
@@ -99,8 +108,8 @@ public class JsonNode implements Iterable<JsonNode> {
         for (JsonTransformer transformer : transformers) { 
             JsonNode node = new JsonNode(this.value, this.pointer); // no not inherit transformers
             transformer.transform(node);
-            if (this.value != node.value || (this.value != null && !this.value.equals(node.value))) {
-                this.value = node.value; // transformation occurred; use new value
+            if ((this.value == null && node.value != null) || (this.value != null && !this.value.equals(node.value))) {
+                this.value = node.value; // a transformation occurred; use the new value
                 transform(); // recursively iterate through all transformers using new value
                 break; // recursive call handled remaining transformations in list
             }
@@ -659,43 +668,33 @@ public class JsonNode implements Iterable<JsonNode> {
     }
 
     /**
-     * Performs deep copy of {@code Map} and {@code List} objects.
-     *
-     * @param value the value to be recursively copied.
-     * @return the copied value.
+     * Returns a deep copy of the node and all of its children.
+     * <p>
+     * This method applies all transformations while traversing the node's children.
+     * Consequently, the resulting copy does not inherit the transformers from this node.
      */
-    @SuppressWarnings("unchecked")
-    private static Object copy(Object value) {
-        Object result = value; // default: shallow copy of value
-        if (value instanceof Map) {
-            Map map = ((Map)value);
-            HashMap copy = new HashMap(map.size());
-            for (Object key : map.keySet()) {
-                if (key instanceof String) { // non-string keys are ignored
-                    copy.put(key, copy(map.get(key))); // recursive
-                }
+    public JsonNode copy() {
+        JsonNode result = new JsonNode(value, pointer); // start with shallow copy
+        if (isMap()) {
+            HashMap<String, Object> map = new HashMap<String, Object>(size());
+            for (String key : keys()) {
+                map.put(key, get(key).copy().getValue()); // recursive descent
             }
-            result = copy;
-        } else if (value instanceof List) {
-            List list = ((List)value);
-            ArrayList copy = new ArrayList(list.size());
-            for (Object element : list) {
-                copy.add(copy(element)); // recursive
+            result.value = map;
+        } else if (isList()) {
+            ArrayList<Object> list = new ArrayList(size());
+            for (JsonNode element : this) {
+                list.add(element.copy().getValue()); // recursive descent
             }
-            result = copy;
+            result.value = list;
         }
         return result;
     }
 
     /**
-     * Returns a deep copy of this node.
-     */
-    public JsonNode copy() {
-        JsonNode node = new JsonNode(copy(value), pointer); // do not re-transform value
-        node.transformers.addAll(transformers);
-        return node;
-    }
-
+     * Returns a string representation of the JSON node. This method does not
+     * apply transformations to the node's children.
+     */ 
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
