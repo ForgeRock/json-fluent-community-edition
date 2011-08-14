@@ -60,7 +60,8 @@
                 <extensions>true</extensions>
                 <configuration>
                     <instructions>
-                        <Export-Package>org.forgerock.json.fluent.*</Export-Package>
+                        <Import-Package>*</Import-Package>
+                        <Export-Package>org.forgerock.json.fluent</Export-Package>
                     </instructions>
                 </configuration>
             </plugin>
