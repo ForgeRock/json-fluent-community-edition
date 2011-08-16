@@ -81,12 +81,21 @@ public class JsonNode implements Iterable<JsonNode> {
     }
 
     /**
-     * Constructs a root JSON node with a given value.
+     * Constructs a root JSON node with a given value. If the provided value is an instance
+     * of {@code JsonNode}, then this constructor makes a shallow copy of the specified node.
      *
      * @param value the value being wrapped.
      */
     public JsonNode(Object value) {
-        this(value, null, null);
+        if (value instanceof JsonNode) { // make shallow copy
+            JsonNode node = (JsonNode)value;
+            this.value = node.value;
+            this.pointer = node.pointer;
+            this.transformers.addAll(node.transformers);
+        } else {
+            this.value = value;
+            pointer = new JsonPointer();
+        }
     }
 
     /**
