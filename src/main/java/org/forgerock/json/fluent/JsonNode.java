@@ -87,7 +87,7 @@ public class JsonNode implements Iterable<JsonNode> {
      * @param value the value being wrapped.
      */
     public JsonNode(Object value) {
-        if (value instanceof JsonNode) { // make shallow copy
+        if (value != null && value instanceof JsonNode) { // make shallow copy
             JsonNode node = (JsonNode)value;
             this.value = node.value;
             this.pointer = node.pointer;
