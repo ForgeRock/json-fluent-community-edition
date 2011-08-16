@@ -90,16 +90,6 @@ public class JsonNode implements Iterable<JsonNode> {
     }
 
     /**
-     * Constructs a new JSON node with the value, pointer and transformers of the specified
-     * JSON node. Transformations are not reapplied as a result of creating the new node.
-     */
-    public JsonNode(JsonNode node) {
-        this.value = node.value;
-        this.pointer = node.pointer;
-        this.transformers.addAll(node.transformers);
-    }
-
-    /**
      * TODO: Description.
      *
      * @throws JsonException if a transformer failed to perform a transformation.
