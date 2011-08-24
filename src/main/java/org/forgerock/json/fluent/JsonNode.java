@@ -29,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 /**
  * Represents a node in a JSON object model structure.
@@ -328,6 +330,21 @@ public class JsonNode implements Iterable<JsonNode> {
                 sb.append(constant.toString()).append(' ');
             }
             throw new JsonNodeException(this, sb.toString());
+        }
+    }
+
+    /**
+     * Returns the node string value as a regular expression pattern. If the node value is
+     * {@code null}, this method returns {@code null}.
+     *
+     * @return the compiled regular expression pattern.
+     * @throws JsonNodeException if the pattern is not a string or the value is not a valid regular expression pattern.
+     */
+    public Pattern asPattern() throws JsonNodeException {
+        try {
+            return (value == null ? null : Pattern.compile(asString()));
+        } catch (PatternSyntaxException pse) {
+            throw new JsonNodeException(this, pse);
         }
     }
 
