@@ -531,6 +531,65 @@ public class JsonNode implements Iterable<JsonNode> {
     }
 
     /**
+     * Replace the value of the specified child node.
+     * <p/>
+     * This won't create the object for path non existing path.
+     *
+     * @param pointer element identifying the child node to put.
+     * @param value the value to assign to the child node.
+     * @throws JsonNodeException if the specified child node is invalid.
+     */
+    public void put(JsonPointer pointer, Object value) throws JsonNodeException {
+        //TODO Implement this method properly. This is an urgent fix only!!!
+        Object oldValue = getValue();
+        JsonPointer current = getPointer();
+        Iterator<String> i = pointer.iterator();
+        if (i.hasNext()) {
+            while (i.hasNext()) {
+                if (null == oldValue) {
+                    throw new JsonNodeException(new JsonNode(oldValue, current), "expecting a value");
+                }
+                String token = i.next();
+                if (i.hasNext()) {
+                    current = current.child(token);
+                    if (oldValue instanceof Map) {
+                        oldValue = ((Map) oldValue).get(token);
+                    } else if (oldValue instanceof List) {
+                        try {
+                            int index = toIndex(token);
+                            if (index < 0 || index > ((List) oldValue).size()) {
+                                throw new JsonNodeException(new JsonNode(oldValue, current), "index out of range");
+                            }
+                            oldValue = ((List) oldValue).get(index);
+                        } catch (NumberFormatException e) {
+                            throw new JsonNodeException(new JsonNode(oldValue, current), "expecting and index on JsonPointer for List value", e);
+                        }
+                    } else {
+                        throw new JsonNodeException(new JsonNode(oldValue, current), "expecting List or Map");
+                    }
+                } else {
+                    if (oldValue instanceof Map) {
+                        ((Map) oldValue).put(token, value);
+                    } else if (oldValue instanceof List) {
+                        try {
+                            int index = toIndex(token);
+                            if (index < 0 || index > ((List) oldValue).size()) {
+                                throw new JsonNodeException(new JsonNode(oldValue, current), "index out of range");
+                            }
+                            ((List) oldValue).set(index, value);
+                        } catch (NumberFormatException e) {
+                            throw new JsonNodeException(new JsonNode(oldValue, current), "expecting and index on JsonPointer for List value", e);
+                        }
+                    }
+                    break;
+                }
+            }
+        } else {
+            setValue(value);
+        }
+    }
+
+    /**
      * Removes the specified child node.
      *
      * @param key property or element identifying the child node to remove.
