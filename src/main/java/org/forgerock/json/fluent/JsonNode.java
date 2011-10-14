@@ -18,8 +18,12 @@
 package org.forgerock.json.fluent;
 
 // Java Standard Edition
+import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.Charset;
+import java.nio.charset.IllegalCharsetNameException;
+import java.nio.charset.UnsupportedCharsetException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -189,11 +193,43 @@ public class JsonNode implements Iterable<JsonNode> {
      * method returns {@code null}.
      *
      * @return the map value, or {@code null} if no value.
-     * @throws JsonNodeException if the node value is not a {@code Map}.
+     * @throws JsonNodeException if the node value is not a {@code Map} or contains non-{@code String} keys.
      */
     @SuppressWarnings("unchecked")
     public Map<String, Object> asMap() throws JsonNodeException {
-        return (value == null ? null : ((Map)expect(Map.class).value));
+        Map result = (value == null ? null : ((Map)expect(Map.class).value));
+        if (result != null) {
+            for (Object key : result.keySet()) {
+                if (key == null || !(key instanceof String)) {
+                    throw new JsonNodeException(this, "non-string key encountered in map");
+                }
+            }
+        }
+        return result; 
+    }
+
+    /**
+     * Returns the node value as a {@link Map} containing objects of the specified type. If
+     * the value is {@code null}, this method returns {@code null}. If any of the entries
+     * in the map are not {@code null} and not of the specified type,
+     * {@code JsonNodeException} is thrown.
+     *
+     * @param type the type of object that all entries in the map are expected to be.
+     * @return the map value, or {@code} null if no value.
+     * @throws JsonNodeException if the node value is not a map or contains an unexpected type.
+     */
+    @SuppressWarnings("unchecked")
+    public <V> Map<String, V> asMap(Class<V> type) throws JsonNodeException {
+        Map<String, Object> map = asMap();
+        if (map != null) {
+            for (String key : map.keySet()) {
+                Object value = map.get(key);
+                if (value != null && !type.isInstance(value)) {
+                    throw new JsonNodeException(this, "expecting " + type.getName() + " entries");
+                }
+            }
+        }
+        return (Map)map;
     }
 
     /**
@@ -213,6 +249,29 @@ public class JsonNode implements Iterable<JsonNode> {
     @SuppressWarnings("unchecked")
     public List<Object> asList() throws JsonNodeException {
         return (value == null ? null : ((List)expect(List.class).value));
+    }
+
+    /**
+     * Returns the node value as a {@link List} containing objects of the specified type. If
+     * the value is {@code null}, this method returns {@code null}. If any of the elements
+     * of the list are not {@code null} and not of the specified type,
+     * {@code JsonNodeException} is thrown.
+     *
+     * @param type the type of object that all elements are expected to be.
+     * @return the list value, or {@code} null if no value.
+     * @throws JsonNodeException if the node value is not a list or contains an unexpected type.
+     */
+    @SuppressWarnings("unchecked")
+    public <E> List<E> asList(Class<E> type) throws JsonNodeException {
+        List list = asList(); // expects a list type
+        if (list != null) {
+            for (Object value : list) {
+                if (value != null && !type.isInstance(value)) {
+                    throw new JsonNodeException(this, "expecting " + type.getName() + " elements");
+                }
+            }
+        }
+        return list;
     }
 
     /**
@@ -334,6 +393,32 @@ public class JsonNode implements Iterable<JsonNode> {
     }
 
     /**
+     * Returns the node string value as a {@code File} object. If the node value is
+     * {@code null}, this method returns {@code null}.
+     */
+    public File asFile() throws JsonNodeException {
+        String s = asString();
+        return (s != null ? new File(s) : null);
+    }
+
+    /**
+     * Returns the node string value as a character set used for byte encoding/decoding.
+     * If the node value is {@code null}, this method returns {@code null}.
+     *
+     * @return the character set represented by the string value.
+     * @throws JsonNodeException if the character set specified is invalid.
+     */
+    public Charset asCharset() throws JsonNodeException {
+        try {
+            return (value == null ? null : Charset.forName(asString()));
+        } catch (IllegalCharsetNameException icne) {
+            throw new JsonNodeException(this, icne);
+        } catch (UnsupportedCharsetException uce) {
+            throw new JsonNodeException(this, uce);
+        }
+    }
+
+    /**
      * Returns the node string value as a regular expression pattern. If the node value is
      * {@code null}, this method returns {@code null}.
      *
@@ -362,6 +447,7 @@ public class JsonNode implements Iterable<JsonNode> {
             throw new JsonNodeException(this, use);
         }
     }
+
 
     /**
      * Returns the node string value as a JSON pointer. If the node value is {@code null},
@@ -539,6 +625,7 @@ public class JsonNode implements Iterable<JsonNode> {
      * @param value the value to assign to the child node.
      * @throws JsonNodeException if the specified child node is invalid.
      */
+    @SuppressWarnings("unchecked")
     public void put(JsonPointer pointer, Object value) throws JsonNodeException {
         //TODO Implement this method properly. This is an urgent fix only!!!
         Object oldValue = getValue();
@@ -757,7 +844,7 @@ public class JsonNode implements Iterable<JsonNode> {
             }
             result.value = map;
         } else if (isList()) {
-            ArrayList<Object> list = new ArrayList(size());
+            ArrayList<Object> list = new ArrayList<Object>(size());
             for (JsonNode element : this) {
                 list.add(element.copy().getValue()); // recursive descent
             }

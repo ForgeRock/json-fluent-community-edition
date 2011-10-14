@@ -16,7 +16,7 @@ public class JsonNodeTest {
     @Test
     public void testPutWithJsonPointer() throws Exception {
 
-        List listObject1 = new ArrayList(3);
+        List<String> listObject1 = new ArrayList<String>(3);
         listObject1.add("valueA");
         listObject1.add("valueB");
         listObject1.add("valueC");
@@ -32,7 +32,7 @@ public class JsonNodeTest {
         mapObject2.put("keyJ", mapObject1);
 
 
-        List listObject2 = new ArrayList(3);
+        List<String> listObject2 = new ArrayList<String>(3);
         listObject2.add("valueD");
         listObject2.add("valueE");
         listObject2.add("valueF");
