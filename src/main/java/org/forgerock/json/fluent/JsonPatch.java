@@ -29,8 +29,8 @@ import java.util.List;
  */
 public class JsonPatch {
 
-    /** Media type for JSON Patch format. */
-    public static final String MEDIA_TYPE = "application/patch+json";
+    /** Internet media type for JSON Patch format. */
+    public static final String MEDIA_TYPE = "application/json-patch";
 
     /**
      * TODO: Description.
@@ -38,18 +38,18 @@ public class JsonPatch {
      * Note: If an unexpected (non-JSON) type is encountered, this method returns
      * {@code true}, triggering a change in the resulting patch. 
      */
-    private static boolean differentTypes(JsonNode n1, JsonNode n2) {
-        if (n1.isNull() && n2.isNull()) { // both values are null
+    private static boolean differentTypes(JsonValue v1, JsonValue v2) {
+        if (v1.isNull() && v2.isNull()) { // both values are null
             return false;
-        } else if (n1.isMap() && n2.isMap()) {
+        } else if (v1.isMap() && v2.isMap()) {
             return false;
-        } else if (n1.isList() && n2.isList()) {
+        } else if (v1.isList() && v2.isList()) {
             return false;
-        } else if (n1.isString() && n2.isString()) {
+        } else if (v1.isString() && v2.isString()) {
             return false;
-        } else if (n1.isNumber() && n2.isNumber()) {
+        } else if (v1.isNumber() && v2.isNumber()) {
             return false;
-        } else if (n1.isBoolean() && n2.isBoolean()) {
+        } else if (v1.isBoolean() && v2.isBoolean()) {
             return false;
         } else {
             return true;
@@ -64,7 +64,7 @@ public class JsonPatch {
      * @param value TODO.
      * @return TODO.
      */
-    private static HashMap<String, Object> op(String op, JsonPointer pointer, JsonNode value) {
+    private static HashMap<String, Object> op(String op, JsonPointer pointer, JsonValue value) {
         HashMap<String, Object> result = new HashMap<String, Object>();
         result.put(op, pointer.toString());
         if (value != null) {
@@ -76,37 +76,37 @@ public class JsonPatch {
     /**
      * TODO: Description.
      *
-     * @param n1 TODO.
-     * @param n2 TODO.
-     * @throws NullPointerException if either of {@code n1} or {@code n2} are {@code null}.
+     * @param v1 TODO.
+     * @param v2 TODO.
+     * @throws NullPointerException if either of {@code v1} or {@code v2} are {@code null}.
      */
-    public static JsonNode diff(JsonNode n1, JsonNode n2) {
+    public static JsonValue diff(JsonValue v1, JsonValue v2) {
         ArrayList<Object> result = new ArrayList<Object>();
-        if (differentTypes(n1, n2)) { // different types cause a replace
-            result.add(op("replace", n1.getPointer(), n2));
-        } else if (n1.isMap()) {
-            for (String key : n1.keys()) {
-                if (n2.isDefined(key)) { // n2 also has the property
-                    JsonNode diff = diff(n1.get(key), n2.get(key)); // recursively compare properties
+        if (differentTypes(v1, v2)) { // different types cause a replace
+            result.add(op("replace", v1.getPointer(), v2));
+        } else if (v1.isMap()) {
+            for (String key : v1.keys()) {
+                if (v2.isDefined(key)) { // v2 also has the property
+                    JsonValue diff = diff(v1.get(key), v2.get(key)); // recursively compare properties
                     if (diff.size() > 0) {
                         result.addAll(diff.asList()); // add diff results
                     }
-                } else { // property is missing in n2
-                    result.add(op("remove", n1.getPointer().child(key), null));
+                } else { // property is missing in v2
+                    result.add(op("remove", v1.getPointer().child(key), null));
                 }
             }
-            for (String key : n2.keys()) {
-                if (!n1.isDefined(key)) { // property is in n2, not in n1
-                    result.add(op("add", n1.getPointer().child(key), n2.get(key)));
+            for (String key : v2.keys()) {
+                if (!v1.isDefined(key)) { // property is in v2, not in v1
+                    result.add(op("add", v1.getPointer().child(key), v2.get(key)));
                 }
             }
-        } else if (n1.isList()) {
+        } else if (v1.isList()) {
             boolean replace = false;
-            if (n1.size() != n2.size()) {
+            if (v1.size() != v2.size()) {
                 replace = true;
             } else {
-                Iterator<JsonNode> i1 = n1.iterator();
-                Iterator<JsonNode> i2 = n2.iterator();
+                Iterator<JsonValue> i1 = v1.iterator();
+                Iterator<JsonValue> i2 = v2.iterator();
                 while (i1.hasNext() && i2.hasNext()) {
                     if (diff(i1.next(), i2.next()).size() > 0) { // recursively compare elements
                         replace = true;
@@ -115,12 +115,12 @@ public class JsonPatch {
                 }
             }
             if (replace) { // replace list entirely
-                result.add(op("replace", n1.getPointer(), n2));
+                result.add(op("replace", v1.getPointer(), v2));
             }
-        } else if (!n1.isNull() && !n1.getValue().equals(n2.getValue())) { // simple value comparison
-            result.add(op("replace", n1.getPointer(), n2));
+        } else if (!v1.isNull() && !v1.getValue().equals(v2.getValue())) { // simple value comparison
+            result.add(op("replace", v1.getPointer(), v2));
         }
-        return new JsonNode(result);
+        return new JsonValue(result);
     }
 
     /**
@@ -128,12 +128,12 @@ public class JsonPatch {
      *
      * @param op the patch operation containing the value.
      * @return the value specified in the operation.
-     * @throws JsonNodeException if a value is not provided.
+     * @throws JsonValueException if a value is not provided.
      */
-    private static Object opValue(JsonNode op) throws JsonNodeException {
+    private static Object opValue(JsonValue op) throws JsonValueException {
         Object value = op.get("value").getValue();
         if (value == null && !op.isDefined("value")) { // allow explicit null value
-            throw new JsonNodeException(op, "expecting value property");
+            throw new JsonValueException(op, "expecting value member");
         }
         return value;
     }
@@ -145,15 +145,15 @@ public class JsonPatch {
      * @param pointer TODO.
      * @param target TODO.
      * @return TODO.
-     * @throws JsonNodeException TODO.
+     * @throws JsonValueException TODO.
      */
-    private static JsonNode parentNode(JsonPointer pointer, JsonNode target) throws JsonException {
-        JsonNode result = null;
+    private static JsonValue parentValue(JsonPointer pointer, JsonValue target) throws JsonException {
+        JsonValue result = null;
         JsonPointer parent = pointer.parent();
         if (parent != null) {
             result = target.get(parent);
             if (result == null) {
-                throw new JsonException("parent node not found");
+                throw new JsonException("parent value not found");
             }
         }
         return result;
@@ -168,48 +168,48 @@ public class JsonPatch {
      *
      * @param target TODO.
      * @param diff TODO.
-     * @throws JsonNodeException TODO.
+     * @throws JsonValueException TODO.
      */
-    public static void patch(JsonNode target, JsonNode diff) throws JsonNodeException {
-        for (JsonNode op : diff.required().expect(List.class)) {
+    public static void patch(JsonValue target, JsonValue diff) throws JsonValueException {
+        for (JsonValue op : diff.required().expect(List.class)) {
             JsonPointer pointer;
             if ((pointer = op.get("replace").asPointer()) != null) {
-                JsonNode parent = parentNode(pointer, target);
+                JsonValue parent = parentValue(pointer, target);
                 if (parent != null) { // replacing a child
                     String leaf = pointer.leaf();
                     if (!parent.isDefined(leaf)) {
-                        throw new JsonNodeException(op, "node not found");
+                        throw new JsonValueException(op, "value to replace not found");
                     }
                     parent.put(leaf, opValue(op));
-                } else { // replacing the root node itself
+                } else { // replacing the root value itself
                     target.setValue(opValue(op));
                 }
             } else if ((pointer = op.get("add").asPointer()) != null) {
-                JsonNode parent = parentNode(pointer, target);
+                JsonValue parent = parentValue(pointer, target);
                 if (parent == null) {
-                    throw new JsonNodeException(op, "cannot add root node");
+                    throw new JsonValueException(op, "cannot add root value");
                 }
                 try {
                     parent.add(pointer.leaf(), opValue(op));
                 } catch (JsonException je) {
-                    throw new JsonNodeException(op, je);
+                    throw new JsonValueException(op, je);
                 }
             } else if ((pointer = op.get("remove").asPointer()) != null) {
-                JsonNode parent = parentNode(pointer, target);
+                JsonValue parent = parentValue(pointer, target);
                 String leaf = pointer.leaf();
                 if (parent == null) {
-                    throw new JsonNodeException(op, "cannot remove root node");
+                    throw new JsonValueException(op, "cannot remove root value");
                 }
                 if (!parent.isDefined(leaf)) {
-                    throw new JsonNodeException(op, "node not found");
+                    throw new JsonValueException(op, "value to remove not found");
                 }
                 try {
                     parent.remove(leaf);
                 } catch (JsonException je) {
-                    throw new JsonNodeException(op, je);
+                    throw new JsonValueException(op, je);
                 }
             } else {
-                throw new JsonNodeException(op, "expecting add, remove or replace property");
+                throw new JsonValueException(op, "expecting add, remove or replace member");
             }
         }
     }

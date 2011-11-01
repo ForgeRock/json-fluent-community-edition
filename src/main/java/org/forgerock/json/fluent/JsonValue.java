@@ -25,6 +25,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.nio.charset.UnsupportedCharsetException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -37,34 +38,34 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 /**
- * Represents a node in a JSON object model structure.
+ * Represents a value in a JSON structure.
  *
  * @author Paul C. Bryan
  */
-public class JsonNode implements Iterable<JsonNode> {
+public class JsonValue implements Iterable<JsonValue> {
 
-    /** Transformers to apply to the node, and are inherited by its children. */
+    /** Transformers to apply to the JSON value; are inherited by its children. */
     private final ArrayList<JsonTransformer> transformers = new ArrayList<JsonTransformer>();
 
-    /** The pointer to the node within the object model structure. */
+    /** The pointer to the value within a JSON structure. */
     private final JsonPointer pointer;
 
-    /** The value being wrapped by the node. */
+    /** The raw value being wrapped by this JSON value. */
     private Object value;
 
     /**
-     * Constructs a JSON node with given value, pointer and transformers.
+     * Constructs a JSON value object with given value, pointer and transformers.
      * <p>
-     * Transformations are applied to the node value, by the transformers in the order
-     * specified in the list. Transformers are inherited by the node's children and are
-     * applied upon construction of such child nodes.
+     * Transformations are applied to the value, by the transformers in the order specified
+     * in the list. Transformers are inherited by the value's children and are applied upon
+     * construction of such child {@code JsonValue} objects.
      *
-     * @param value the value being wrapped.
-     * @param pointer the pointer to assign this node in a JSON object model structure.
-     * @param transformers a list of transformers to apply to node values.
-     * @throws JsonException if a transformer failed during node initialization.
+     * @param value the value to wrap with the JSON value object.
+     * @param pointer the pointer to the value in a JSON structure.
+     * @param transformers a list of transformers to apply to values.
+     * @throws JsonException if a transformer failed during value initialization.
      */
-    public JsonNode(Object value, JsonPointer pointer, List<JsonTransformer> transformers) throws JsonException {
+    public JsonValue(Object value, JsonPointer pointer, Collection<? extends JsonTransformer> transformers) throws JsonException {
         if (pointer == null) {
             pointer = new JsonPointer();
         }
@@ -77,27 +78,29 @@ public class JsonNode implements Iterable<JsonNode> {
     }
 
     /**
-     * Constructs a JSON node with given value and pointer.
+     * Constructs a JSON value object with a given value and pointer.
      *
-     * @param value the value being wrapped.
-     * @param pointer the pointer to assign this node in a JSON object model structure.
+     * @param value the value to wrap with the JSON value object.
+     * @param pointer the pointer to the value in a JSON structure.
      */
-    public JsonNode(Object value, JsonPointer pointer) {
+    public JsonValue(Object value, JsonPointer pointer) {
         this(value, pointer, null);
     }
 
     /**
-     * Constructs a root JSON node with a given value. If the provided value is an instance
-     * of {@code JsonNode}, then this constructor makes a shallow copy of the specified node.
+     * Constructs a JSON value object with a given value.
+     * <p>
+     * If the provided value is an instance of {@code JsonValue}, then this constructor makes
+     * a shallow copy of its members.
      *
-     * @param value the value being wrapped.
+     * @param value the value to wrap with the JSON value object.
      */
-    public JsonNode(Object value) {
-        if (value != null && value instanceof JsonNode) { // make shallow copy
-            JsonNode node = (JsonNode)value;
-            this.value = node.value;
-            this.pointer = node.pointer;
-            this.transformers.addAll(node.transformers);
+    public JsonValue(Object value) {
+        if (value != null && value instanceof JsonValue) { // make shallow copy
+            JsonValue jv = (JsonValue)value;
+            this.value = jv.value;
+            this.pointer = jv.pointer;
+            this.transformers.addAll(jv.transformers);
         } else {
             this.value = value;
             pointer = new JsonPointer();
@@ -105,16 +108,18 @@ public class JsonNode implements Iterable<JsonNode> {
     }
 
     /**
-     * TODO: Description.
+     * Applies all of the transformations to the value. As each transformer is applied,
+     * all transformations are applied again recursively. This process terminates when the
+     * result of applying transformations no longer affects the value.
      *
-     * @throws JsonException if a transformer failed to perform a transformation.
+     * @throws JsonException if a transformer failed to apply a transformation.
      */
     private void transform() throws JsonException {
         for (JsonTransformer transformer : transformers) { 
-            JsonNode node = new JsonNode(this.value, this.pointer); // no not inherit transformers
-            transformer.transform(node);
-            if ((this.value == null && node.value != null) || (this.value != null && !this.value.equals(node.value))) {
-                this.value = node.value; // a transformation occurred; use the new value
+            JsonValue jv = new JsonValue(this.value, this.pointer); // do not inherit transformers
+            transformer.transform(jv);
+            if ((this.value == null && jv.value != null) || (this.value != null && !this.value.equals(jv.value))) {
+                this.value = jv.value; // a transformation occurred; use the new value
                 transform(); // recursively iterate through all transformers using new value
                 break; // recursive call handled remaining transformations in list
             }
@@ -122,86 +127,114 @@ public class JsonNode implements Iterable<JsonNode> {
     }
 
     /**
-     * Returns the value being wrapped by the node.
+     * Returns the value being wrapped by the JSON value object.
      */
     public Object getValue() {
         return value;
     }
 
     /**
-     * Sets the value being wrapped by the node. This does not modify the parent node
-     * in any way; use the {@link #put(String, Object)} method to do so.
+     * Sets the value being wrapped by the JSON value object. This does not modify the parent
+     * value in any way; use the {@link #put(String, Object)} method to do so.
      *
      * @param value the value to set.
      */
     public void setValue(Object value) {
         this.value = value;
-    }
 
+    }
     /**
-     * Returns the pointer of the node in the JSON object model structure.
+     * Returns the pointer of the JSON value in the JSON structure.
      */
     public JsonPointer getPointer() {
         return pointer;
     }
 
     /**
-     * Returns the node's list of transformers. The list modifiable; child nodes shall
-     * inherit the modified list.
+     * Returns the JSON value's list of transformers. The list is modifiable; child values
+     * shall inherit the modified list.
      */
     public List<JsonTransformer> getTransformers() {
         return transformers;
     }
 
     /**
-     * Throws a {@code JsonNodeException} if the node value is {@code null}.
+     * Adds and applies a transformer to the value. This results in applying all other
+     * transformations to the value.
      *
-     * @throws JsonNodeException if the node value is {@code null}.
-     * @return the node.
+     * @param transformer the transformer to add.
+     * @return this JSON value.
+     * @throws JsonException if a transformer failed to apply a transformation.
      */
-    public JsonNode required() throws JsonNodeException {
+    public JsonValue addTransformer(JsonTransformer transformer) throws JsonException {
+        transformers.add(transformer);
+        transform();
+        return this;
+    }
+
+    /**
+     * Adds and applies a collection of transformers to the value. This results in applying
+     * all other transformations to the value
+     *
+     * @param transformers the transformers to add.
+     * @return this JSON value.
+     * @throws JsonException if a transformer failed to apply a transformation.
+     */
+    public JsonValue addTransformers(Collection<? extends JsonTransformer> transformers) {
+        this.transformers.addAll(transformers);
+        transform();
+        return this;
+    }
+
+    /**
+     * Throws a {@code JsonValueException} if the JSON value is {@code null}.
+     *
+     * @throws JsonValueException if the JSON value is {@code null}.
+     * @return this JSON value.
+     */
+    public JsonValue required() throws JsonValueException {
         if (value == null) {
-            throw new JsonNodeException(this, "expecting a value");
+            throw new JsonValueException(this, "expecting a value");
         }
         return this;
     }
 
     /**
-     * Called to enforce that the node value is of a particular type. A value of
-     * {@code null} is allowed.
+     * Called to enforce that the JSON value is of a particular type. A value of {@code null}
+     * is allowed.
      *
      * @param type the class that the underlying value must have.
-     * @return the node.
-     * @throws JsonNodeException if the value is not the specified type.
+     * @return this JSON value.
+     * @throws JsonValueException if the value is not the specified type.
      */
-    public JsonNode expect(Class type) throws JsonNodeException {
+    public JsonValue expect(Class type) throws JsonValueException {
         if (value != null && !type.isInstance(value)) {
-            throw new JsonNodeException(this, "expecting " + type.getName());
+            throw new JsonValueException(this, "expecting " + type.getName());
         }
         return this;
     }
 
     /**
-     * Returns {@code true} if the node value is a {@link Map}.
+     * Returns {@code true} if the JSON value is a {@link Map}.
      */
     public boolean isMap() {
         return (value != null && value instanceof Map);
     }
 
     /**
-     * Returns the node value as a {@code Map} object. If the node value is {@code null}, this
+     * Returns the JSON value as a {@code Map} object. If the JSON value is {@code null}, this
      * method returns {@code null}.
      *
      * @return the map value, or {@code null} if no value.
-     * @throws JsonNodeException if the node value is not a {@code Map} or contains non-{@code String} keys.
+     * @throws JsonValueException if the JSON value is not a {@code Map} or contains non-{@code String} keys.
      */
     @SuppressWarnings("unchecked")
-    public Map<String, Object> asMap() throws JsonNodeException {
+    public Map<String, Object> asMap() throws JsonValueException {
         Map result = (value == null ? null : ((Map)expect(Map.class).value));
         if (result != null) {
             for (Object key : result.keySet()) {
                 if (key == null || !(key instanceof String)) {
-                    throw new JsonNodeException(this, "non-string key encountered in map");
+                    throw new JsonValueException(this, "non-string key encountered in map");
                 }
             }
         }
@@ -209,23 +242,23 @@ public class JsonNode implements Iterable<JsonNode> {
     }
 
     /**
-     * Returns the node value as a {@link Map} containing objects of the specified type. If
+     * Returns the JSON value as a {@link Map} containing objects of the specified type. If
      * the value is {@code null}, this method returns {@code null}. If any of the entries
      * in the map are not {@code null} and not of the specified type,
-     * {@code JsonNodeException} is thrown.
+     * {@code JsonValueException} is thrown.
      *
      * @param type the type of object that all entries in the map are expected to be.
      * @return the map value, or {@code} null if no value.
-     * @throws JsonNodeException if the node value is not a map or contains an unexpected type.
+     * @throws JsonValueException if the JSON value is not a {@code Map} or contains an unexpected type.
      */
     @SuppressWarnings("unchecked")
-    public <V> Map<String, V> asMap(Class<V> type) throws JsonNodeException {
+    public <V> Map<String, V> asMap(Class<V> type) throws JsonValueException {
         Map<String, Object> map = asMap();
         if (map != null) {
             for (String key : map.keySet()) {
                 Object value = map.get(key);
                 if (value != null && !type.isInstance(value)) {
-                    throw new JsonNodeException(this, "expecting " + type.getName() + " entries");
+                    throw new JsonValueException(this, "expecting " + type.getName() + " entries");
                 }
             }
         }
@@ -233,41 +266,41 @@ public class JsonNode implements Iterable<JsonNode> {
     }
 
     /**
-     * Returns {@code true} if the node value is a {@link List}.
+     * Returns {@code true} if the JSON value is a {@link List}.
      */
     public boolean isList() {
         return (value != null && value instanceof List);
     }
 
     /**
-     * Returns the node value as a {@link List} object. If the node value is {@code null},
+     * Returns the JSON value as a {@link List} object. If the JSON value is {@code null},
      * this method returns {@code null}.
      *
      * @return the list value, or {@code} null if no value.
-     * @throws JsonNodeException if the node value is not a list.
+     * @throws JsonValueException if the JSON value is not a {@code List}.
      */
     @SuppressWarnings("unchecked")
-    public List<Object> asList() throws JsonNodeException {
+    public List<Object> asList() throws JsonValueException {
         return (value == null ? null : ((List)expect(List.class).value));
     }
 
     /**
-     * Returns the node value as a {@link List} containing objects of the specified type. If
+     * Returns the JSON value as a {@link List} containing objects of the specified type. If
      * the value is {@code null}, this method returns {@code null}. If any of the elements
      * of the list are not {@code null} and not of the specified type,
-     * {@code JsonNodeException} is thrown.
+     * {@code JsonValueException} is thrown.
      *
      * @param type the type of object that all elements are expected to be.
      * @return the list value, or {@code} null if no value.
-     * @throws JsonNodeException if the node value is not a list or contains an unexpected type.
+     * @throws JsonVaueException if the JSON value is not a {@code List} or contains an unexpected type.
      */
     @SuppressWarnings("unchecked")
-    public <E> List<E> asList(Class<E> type) throws JsonNodeException {
+    public <E> List<E> asList(Class<E> type) throws JsonValueException {
         List list = asList(); // expects a list type
         if (list != null) {
             for (Object value : list) {
                 if (value != null && !type.isInstance(value)) {
-                    throw new JsonNodeException(this, "expecting " + type.getName() + " elements");
+                    throw new JsonValueException(this, "expecting " + type.getName() + " elements");
                 }
             }
         }
@@ -275,89 +308,89 @@ public class JsonNode implements Iterable<JsonNode> {
     }
 
     /**
-     * Returns {@code true} if the node value is a {@link String}.
+     * Returns {@code true} if the JSON value is a {@link String}.
      */
     public boolean isString() {
         return (value != null && value instanceof String);
     }
 
     /**
-     * Returns the node value as a {@code String} object. If the node value is {@code null},
+     * Returns the JSON value as a {@code String} object. If the JSON value is {@code null},
      * this method returns {@code null}.
      * 
      * @return the string value.
-     * @throws JsonNodeException if the node value is not a string.
+     * @throws JsonValueException if the JSON value is not a string.
      */
-    public String asString() throws JsonNodeException {
+    public String asString() throws JsonValueException {
         return (value == null ? null : ((String)expect(String.class).value));
     }
 
     /**
-     * Returns {@code true} if the node value is a {@link Number}.
+     * Returns {@code true} if the JSON value is a {@link Number}.
      */
     public boolean isNumber() {
         return (value != null && value instanceof Number);
     }
 
     /**
-     * Returns the node value as a {@code Number} object. If the node value is {@code null},
+     * Returns the JSON value as a {@code Number} object. If the JSON value is {@code null},
      * this method returns {@code null}.
      *
      * @return the numeric value.
-     * @throws JsonNodeException if the node value is not a number.
+     * @throws JsonValueException if the JSON value is not a number.
      */
-    public Number asNumber() throws JsonNodeException {
+    public Number asNumber() throws JsonValueException {
         return (value == null ? null : (Number)expect(Number.class).value);
     }
 
     /**
-     * Returns the node value as an {@link Integer} object. This may involve rounding or
-     * truncation. If the node value is {@code null}, this method returns {@code null}.
+     * Returns the JSON value as an {@link Integer} object. This may involve rounding or
+     * truncation. If the JSON value is {@code null}, this method returns {@code null}.
      *
      * @return the integer value.
-     * @throws JsonNodeException if the node value is not a number.
+     * @throws JsonValueException if the JSON value is not a number.
      */
-    public Integer asInteger() throws JsonNodeException {
+    public Integer asInteger() throws JsonValueException {
         return (value == null ? null : Integer.valueOf(asNumber().intValue()));
     }
 
     /**
-     * Returns the node value as a {@link Double} object. This may involve rounding.
-     * If the node value is {@code null}, this method returns {@code null}.
+     * Returns the JSON value as a {@link Double} object. This may involve rounding.
+     * If the JSON value is {@code null}, this method returns {@code null}.
      *
      * @return the double-precision floating point value.
-     * @throws JsonNodeException if the node value is not a number.
+     * @throws JsonValueException if the JSON value is not a number.
      */
-    public Double asDouble() throws JsonNodeException {
+    public Double asDouble() throws JsonValueException {
         return (value == null ? null : Double.valueOf(asNumber().doubleValue()));
     }
 
     /**
-     * Returns the node value as a {@link Long} object. This may involve rounding or
-     * truncation. If the node value is {@code null}, this method returns {@code null}.
+     * Returns the JSON value as a {@link Long} object. This may involve rounding or
+     * truncation. If the JSON value is {@code null}, this method returns {@code null}.
      *
      * @return the long integer value.
-     * @throws JsonNodeException if the node value is not a number.
+     * @throws JsonValueException if the JSON value is not a number.
      */
-    public Long asLong() throws JsonNodeException {
+    public Long asLong() throws JsonValueException {
         return (value == null ? null : Long.valueOf(asNumber().longValue()));
     }
 
     /**
-     * Returns {@code true} if the node value is a {@link Boolean}.
+     * Returns {@code true} if the JSON value is a {@link Boolean}.
      */
     public boolean isBoolean() {
         return (value != null && value instanceof Boolean);
     }
 
     /**
-     * Returns the node value as a {@link Boolean} object. If the value is {@code null},
+     * Returns the JSON value as a {@link Boolean} object. If the value is {@code null},
      * this method returns {@code null}.
      *
      * @return the boolean value.
-     * @throws JsonNodeException if the node value is not a boolean type.
+     * @throws JsonValueException if the JSON value is not a boolean type.
      */
-    public Boolean asBoolean() throws JsonNodeException {
+    public Boolean asBoolean() throws JsonValueException {
         return (value == null ? null : (Boolean)expect(Boolean.class).value);
     }
 
@@ -369,15 +402,15 @@ public class JsonNode implements Iterable<JsonNode> {
     }
 
     /**
-     * Returns the node string value as an enum constant of the specified enum type.
-     * If the node value is {@code null}, this method returns {@code null}.
+     * Returns the JSON string value as an enum constant of the specified enum type.
+     * If the JSON value is {@code null}, this method returns {@code null}.
      *
      * @param type the enum type to match constants with the value.
      * @return the enum constant represented by the string value.
-     * @throws JsonNodeException if the node value does not match any of the enum's constants.
+     * @throws JsonValueException if the JSON value does not match any of the enum's constants.
      * @throws NullPointerException if {@code type} is {@code null}.
      */
-    public <T extends Enum<T>> T asEnum(Class<T> type) throws JsonNodeException {
+    public <T extends Enum<T>> T asEnum(Class<T> type) throws JsonValueException {
         if (type == null) {
             throw new NullPointerException();
         }
@@ -388,114 +421,117 @@ public class JsonNode implements Iterable<JsonNode> {
             for (Object constant : type.getEnumConstants()) {
                 sb.append(constant.toString()).append(' ');
             }
-            throw new JsonNodeException(this, sb.toString());
+            throw new JsonValueException(this, sb.toString());
         }
     }
 
     /**
-     * Returns the node string value as a {@code File} object. If the node value is
+     * Returns the JSON string value as a {@code File} object. If the JSON value is
      * {@code null}, this method returns {@code null}.
+     *
+     * @return a file represented by the string value.
+     * @throws JsonValueException if the JSON value is not a string.
      */
-    public File asFile() throws JsonNodeException {
+    public File asFile() throws JsonValueException {
         String s = asString();
         return (s != null ? new File(s) : null);
     }
 
     /**
-     * Returns the node string value as a character set used for byte encoding/decoding.
-     * If the node value is {@code null}, this method returns {@code null}.
+     * Returns the JSON string value as a character set used for byte encoding/decoding.
+     * If the JSON value is {@code null}, this method returns {@code null}.
      *
      * @return the character set represented by the string value.
-     * @throws JsonNodeException if the character set specified is invalid.
+     * @throws JsonValueException if the JSON value is not a string or the character set specified is invalid.
      */
-    public Charset asCharset() throws JsonNodeException {
+    public Charset asCharset() throws JsonValueException {
         try {
             return (value == null ? null : Charset.forName(asString()));
         } catch (IllegalCharsetNameException icne) {
-            throw new JsonNodeException(this, icne);
+            throw new JsonValueException(this, icne);
         } catch (UnsupportedCharsetException uce) {
-            throw new JsonNodeException(this, uce);
+            throw new JsonValueException(this, uce);
         }
     }
 
     /**
-     * Returns the node string value as a regular expression pattern. If the node value is
+     * Returns the JSON string value as a regular expression pattern. If the JSON value is
      * {@code null}, this method returns {@code null}.
      *
      * @return the compiled regular expression pattern.
-     * @throws JsonNodeException if the pattern is not a string or the value is not a valid regular expression pattern.
+     * @throws JsonValueException if the pattern is not a string or the value is not a valid regular expression pattern.
      */
-    public Pattern asPattern() throws JsonNodeException {
+    public Pattern asPattern() throws JsonValueException {
         try {
             return (value == null ? null : Pattern.compile(asString()));
         } catch (PatternSyntaxException pse) {
-            throw new JsonNodeException(this, pse);
+            throw new JsonValueException(this, pse);
         }
     }
 
     /**
-     * Returns the node string value as a uniform resource identifier. If the node
-     * value is {@code null}, this method returns {@code null}.
+     * Returns the JSON string value as a uniform resource identifier. If the JSON value is
+     * {@code null}, this method returns {@code null}.
      *
      * @return the URI represented by the string value.
-     * @throws JsonNodeException if the given string violates URI syntax.
+     * @throws JsonValueException if the given string violates URI syntax.
      */
-    public URI asURI() throws JsonNodeException {
+    public URI asURI() throws JsonValueException {
         try {
             return (value == null ? null : new URI(asString()));
         } catch (URISyntaxException use) {
-            throw new JsonNodeException(this, use);
+            throw new JsonValueException(this, use);
         }
     }
 
 
     /**
-     * Returns the node string value as a JSON pointer. If the node value is {@code null},
+     * Returns the JSON string value as a JSON pointer. If the JSON value is {@code null},
      * this method returns {@code null}.
      *
-     * @return the JSON pointer represented by the node value string.
-     * @throws JsonNodeException if the node value is not a valid JSON pointer.
+     * @return the JSON pointer represented by the JSON value string.
+     * @throws JsonValueException if the JSON value is not a string or valid JSON pointer.
      */
-    public JsonPointer asPointer() throws JsonNodeException {
+    public JsonPointer asPointer() throws JsonValueException {
         try {
             return (value == null ? null : new JsonPointer(asString()));
         } catch (JsonException je) {
-            throw (je instanceof JsonNodeException ? je : new JsonNodeException(this, je));
+            throw (je instanceof JsonValueException ? je : new JsonValueException(this, je));
         }
     }
 
     /**
-     * Defaults the node value to the specified value if it is currently {@code null}.
+     * Defaults the JSON value to the specified value if it is currently {@code null}.
      *
      * @param value the string to default to.
-     * @return this node or a new node with the default value.
+     * @return this JSON value or a new JSON value containing the default value.
      */
-    public JsonNode defaultTo(Object value) {
-        return (this.value != null ? this : new JsonNode(value, pointer, transformers));
+    public JsonValue defaultTo(Object value) {
+        return (this.value != null ? this : new JsonValue(value, pointer, transformers));
     }
 
     /**
-     * Returns the key as an array index value. If the string does not represent a valid
-     * index value, then {@code -1} is returned.
+     * Returns the key as an list index value. If the string does not represent a valid
+     * list index value, then {@code -1} is returned.
      *
-     * @param key the string key to be converted into an array index value.
+     * @param key the string key to be converted into an list index value.
      * @return the converted index value, or {@code -1} if invalid.
      */
     private static int toIndex(String key) {
-        int index;
+        int result;
         try {
-            index = Integer.parseInt(key);
+            result = Integer.parseInt(key);
         } catch (NumberFormatException nfe) {
-            index = -1;
+            result = -1;
         }
-        return (index < 0 ? -1 : index);
+        return (result < 0 ? -1 : result);
     }
 
     /**
-     * Returns {@code true} if the specified child node is defined within this node.
+     * Returns {@code true} if the specified child value is defined within this JSON value.
      *
-     * @param key the key of the child node to check for.
-     * @return {@code true} if this node contains the specified child.
+     * @param key the {@code Map} key or {@code List} index of the child value to seek.
+     * @return {@code true} if this JSON value contains the specified child.
      * @throws NullPointerException if {@code key} is {@code null}.
      */
     public boolean isDefined(String key) {
@@ -510,14 +546,14 @@ public class JsonNode implements Iterable<JsonNode> {
     }
 
     /**
-     * Returns the specified child node. If no such child node exists, then a node with a
-     * {@code null} value is returned.
+     * Returns the specified child JSON value. If no such child value exists, then a JSON value
+     * containing {@code null} is returned.
      *
-     * @param key property or element identifying the child node to return.
-     * @return the child node, or a node with {@code null} value.
-     * @throws JsonException if a transformer failed during node initialization.
+     * @param key the {@code Map} key or {@code List} index identifying the child value to return.
+     * @return the child value, or a JSON value containing {@code null}.
+     * @throws JsonException if a transformer failed to transform the child value.
      */
-    public JsonNode get(String key) throws JsonException {
+    public JsonValue get(String key) throws JsonException {
         Object result = null;
         if (isMap()) {
             result = ((Map)value).get(key);
@@ -528,19 +564,19 @@ public class JsonNode implements Iterable<JsonNode> {
                 result = list.get(index);
             }
         }
-        return new JsonNode(result, pointer.child(key), transformers);
+        return new JsonValue(result, pointer.child(key), transformers);
     }
 
     /**
-     * Returns the specified child node. If this node value is not a {@link List} or if no
-     * such child exists, then a node with a {@code null} value is returned.
+     * Returns the specified child value. If this JSON value is not a {@link List} or if no
+     * such child exists, then a JSON value containing a {@code null} is returned.
      *
-     * @param index element identifying the child node to return.
-     * @return the child node, or a node with {@code null} value.
-     * @throws IndexOutOfBoundsException if {@code index < 0}.
-     * @throws JsonException if a transformer failed during node initialization.
+     * @param index index of child element value to return.
+     * @return the child value, or a JSON value containing {@code null}.
+     * @throws IndexOutOfBoundsException if {@code index} is negative.
+     * @throws JsonException if a transformer failed to transform the child value.
      */
-    public JsonNode get(int index) throws JsonException {
+    public JsonValue get(int index) throws JsonException {
         if (index < 0) {
             throw new IndexOutOfBoundsException();
         }
@@ -551,38 +587,41 @@ public class JsonNode implements Iterable<JsonNode> {
                 child = list.get(index);
             }
         }
-        return new JsonNode(child, pointer.child(index), transformers);
+        return new JsonValue(child, pointer.child(index), transformers);
     }
      
     /**
-     * Returns the specified child node. If the specified child does not exist, then
+     * Returns the specified child value. If the specified child value does not exist, then
      * {@code null} is returned.
      *
-     * @param pointer the JSON pointer identifying the child node to return.
-     * @return the child node, or {@code null} if no such child exists.
-     * @throws JsonException if a transformer failed during node initialization.
+     * @param pointer the JSON pointer identifying the child value to return.
+     * @return the child value, or {@code null} if no such value exists.
+     * @throws JsonException if a transformer failed to transform the child value.
      */
-    public JsonNode get(JsonPointer pointer) throws JsonException {
-        JsonNode node = this;
+    public JsonValue get(JsonPointer pointer) throws JsonException {
+        JsonValue result = this;
         for (String token : pointer) {
-            JsonNode child = node.get(token);
-            if (child.isNull() && !node.isDefined(token)) {
-                return null; // undefined node yields a null value, not an empty node
+            JsonValue child = result.get(token);
+            if (child.isNull() && !result.isDefined(token)) {
+                return null; // undefined value yields null, not a JSON value containing null
             }
-            node = child;
+            result = child;
         }
-        return node;
+        return result;
     }
 
     /**
-     * Sets the value of the specified child node.
+     * Sets the value of the specified member.
+     * <p>
+     * If setting a list element, the specified key must be parseable as an unsigned  base-10
+     * integer and be less than or equal to the size of the list.
      *
-     * @param key property or element identifying the child node to put.
-     * @param value the value to assign to the child node.
-     * @throws JsonNodeException if the specified child node is invalid.
+     * @param key the {@code Map} key or {@code List} index identifying the child value to set.
+     * @param value the value to assign to the child member.
+     * @throws JsonValueException if this JSON value is not a {@code Map} or {@code List}.
      * @throws NullPointerException if {@code key} is {@code null}.
      */
-    public void put(String key, Object value) throws JsonNodeException {
+    public void put(String key, Object value) throws JsonValueException {
         if (key == null) {
             throw new NullPointerException();
         }
@@ -591,24 +630,21 @@ public class JsonNode implements Iterable<JsonNode> {
         } else if (isList()) {
             put(toIndex(key), value);
         } else {
-            throw new JsonNodeException(this, "expecting Map or List");
+            throw new JsonValueException(this, "expecting Map or List");
         }
     }
 
     /**
-     * Sets the value of the specified child node.
+     * Sets the value of the specified child list element.
      *
-     * @param index element identifying the child node to put.
-     * @param value the value to assign to the child node.
-     * @throws JsonNodeException if the specified child node is invalid.
+     * @param index the {@code List} index identifying the child value to set.
+     * @param value the value to assign to the list element.
+     * @throws JsonValueException if this JSON value is not a {@code List}.
      */
-    public void put(int index, Object value) throws JsonNodeException {
-        if (!isList()) {
-            throw new JsonNodeException(this, "expecting List");
-        }
-        List<Object> list = asList();
+    public void put(int index, Object value) throws JsonValueException {
+        List<Object> list = required().asList();
         if (index < 0 || index > list.size()) {
-            throw new JsonNodeException(this, "index out of range");
+            throw new JsonValueException(this, "index out of range");
         } else if (index == list.size()) { // appending to end of list
             list.add(value);
         } else { // replacing existing element
@@ -617,69 +653,28 @@ public class JsonNode implements Iterable<JsonNode> {
     }
 
     /**
-     * Replace the value of the specified child node.
-     * <p/>
-     * This won't create the object for path non existing path.
+     * Sets the value of the value identified by the specified pointer. If doing so would
+     * require the creation of a new object or list, a {@code JsonValueException} will be
+     * thrown.
      *
-     * @param pointer element identifying the child node to put.
-     * @param value the value to assign to the child node.
-     * @throws JsonNodeException if the specified child node is invalid.
+     * @param pointer identifies the child value to set.
+     * @param value the value to set.
+     * @throws JsonValueException if the specified pointer is invalid.
      */
-    @SuppressWarnings("unchecked")
-    public void put(JsonPointer pointer, Object value) throws JsonNodeException {
-        //TODO Implement this method properly. This is an urgent fix only!!!
-        Object oldValue = getValue();
-        JsonPointer current = getPointer();
-        Iterator<String> i = pointer.iterator();
-        if (i.hasNext()) {
-            while (i.hasNext()) {
-                if (null == oldValue) {
-                    throw new JsonNodeException(new JsonNode(oldValue, current), "expecting a value");
-                }
-                String token = i.next();
-                if (i.hasNext()) {
-                    current = current.child(token);
-                    if (oldValue instanceof Map) {
-                        oldValue = ((Map) oldValue).get(token);
-                    } else if (oldValue instanceof List) {
-                        try {
-                            int index = toIndex(token);
-                            if (index < 0 || index > ((List) oldValue).size()) {
-                                throw new JsonNodeException(new JsonNode(oldValue, current), "index out of range");
-                            }
-                            oldValue = ((List) oldValue).get(index);
-                        } catch (NumberFormatException e) {
-                            throw new JsonNodeException(new JsonNode(oldValue, current), "expecting and index on JsonPointer for List value", e);
-                        }
-                    } else {
-                        throw new JsonNodeException(new JsonNode(oldValue, current), "expecting List or Map");
-                    }
-                } else {
-                    if (oldValue instanceof Map) {
-                        ((Map) oldValue).put(token, value);
-                    } else if (oldValue instanceof List) {
-                        try {
-                            int index = toIndex(token);
-                            if (index < 0 || index > ((List) oldValue).size()) {
-                                throw new JsonNodeException(new JsonNode(oldValue, current), "index out of range");
-                            }
-                            ((List) oldValue).set(index, value);
-                        } catch (NumberFormatException e) {
-                            throw new JsonNodeException(new JsonNode(oldValue, current), "expecting and index on JsonPointer for List value", e);
-                        }
-                    }
-                    break;
-                }
-            }
-        } else {
-            setValue(value);
+    public void put(JsonPointer pointer, Object value) throws JsonValueException {
+        JsonValue jv = this;
+        String[] tokens = pointer.toArray();
+        for (int n = 0; n < tokens.length -1; n++) {
+            jv = jv.get(tokens[n]).required();
         }
+        jv.put(tokens[tokens.length - 1], value);
     }
 
     /**
-     * Removes the specified child node.
+     * Removes the specified child value. If the specified child value is not defined, calling
+     * this method has no effect.
      *
-     * @param key property or element identifying the child node to remove.
+     * @param key the {@code Map} key or {@code List} index identifying the child value to remove.
      */
     public void remove(String key) {
         if (isMap()) {
@@ -690,9 +685,10 @@ public class JsonNode implements Iterable<JsonNode> {
     }
 
     /**
-     * Removes the specified child node.
+     * Removes the specified child value, shifting any subsequent elements to the left. If the
+     * JSON value is not a {@code List}, calling this method has no effect.
      *
-     * @param index element identifying the child node to remove.
+     * @param index the {@code List} index identifying the child value to remove.
      */
     public void remove(int index) {
         if (index >= 0 && isList()) {
@@ -704,49 +700,50 @@ public class JsonNode implements Iterable<JsonNode> {
     }
 
     /**
-     * Adds the specified child node value.
+     * Adds the specified value.
+     * <p>
+     * If adding to a list value, the specified key must be parseable as an unsigned
+     * base-10 integer and be less than or equal to the list size. Adding a value to a list
+     * shifts any existing elements at or above the specified index to the right by one.
      *
-     * @param key the child node to add.
-     * @param value the value to apply to the new child node.
-     * @throws JsonNodeException if the child already exists or if this node cannot have children.
+     * @param key the {@code Map} key or {@code List} index to add.
+     * @param value the value to add.
+     * @throws JsonValueException if not a {@code Map} or {@code List}, the {@code Map} key already exists, or the {@code List} index is out of range.
      */
-    public void add(String key, Object value) throws JsonNodeException {
+    public void add(String key, Object value) throws JsonValueException {
         if (isMap()) {
             if (isDefined(key)) {
-                throw new JsonNodeException(this, key + " already exists");
+                throw new JsonValueException(this, key + " already exists");
             }
             asMap().put(key, value);
         } else if (isList()) {
             add(toIndex(key), value);
         } else {
-            throw new JsonNodeException(this, "expecting Map or List");
+            throw new JsonValueException(this, "expecting Map or List");
         }
     }
 
     /**
-     * Adds the specified child node value to the list. Adding a node to a list shifts any
-     * existing elements at or above the index to the right by one.
+     * Adds the specified value to the list. Adding a value to a list shifts any existing
+     * elements at or above the specified index to the right by one.
      *
-     * @param index index of the child node to add.
-     * @param value the value to apply to the new child node.
-     * @throws JsonNodeException if the child index is out of range.
+     * @param index the {@code List} index of the value to add.
+     * @param value the value to add.
+     * @throws JsonValueException if this JSON value is not a {@code List} or index is out of range.
      */
-    public void add(int index, Object value) throws JsonNodeException {
-        if (!isList()) {
-            throw new JsonNodeException(this, "expecting List");
-        }
-        List<Object> list = asList();
+    public void add(int index, Object value) throws JsonValueException {
+        List<Object> list = required().asList();
         if (index < 0 || index > list.size()) {
-            throw new JsonNodeException(this, "index out of range");
+            throw new JsonValueException(this, "index out of range");
         } else {
             list.add(index, value);
         }
     }
 
     /**
-     * Removes all child nodes from this node, if it has any.
+     * Removes all child values from this JSON value, if it has any.
      */
-    public void clear() throws JsonNodeException {
+    public void clear() throws JsonValueException {
         if (isMap()) {
             asMap().clear();
         } else if (isList()) {
@@ -755,7 +752,7 @@ public class JsonNode implements Iterable<JsonNode> {
     }
 
     /**
-     * Returns the number of child nodes that this node contains.
+     * Returns the number of child values that this JSON value contains.
      */
     public int size() {
         if (isMap()) {
@@ -768,8 +765,9 @@ public class JsonNode implements Iterable<JsonNode> {
     }
 
     /**
-     * Returns the set of keys for this node's children. If there are no child nodes, this
-     * method returns an empty set.
+     * Returns the set of keys for this JSON value's child values. If this value is a
+     * {@code Map}, then the order of the resulting keys is undefined. If there are no child
+     * values, this method returns an empty set.
      */
     public Set<String> keys() {
         Set<String> result;
@@ -789,37 +787,37 @@ public class JsonNode implements Iterable<JsonNode> {
     }
 
     /**
-     * Returns an iterator the child nodes this node contains. If this node is a {@code Map},
-     * then the order of the resulting child nodes is undefined.
+     * Returns an iterator over the child values that this JSON value contains. If this value
+     * is a {@code Map}, then the order of the resulting child values is undefined.
      * <p>
-     * Note: calls to the {@code next()} method may throw the runtime {@link JsonNodeException}
-     * if any transformers fail.
+     * Note: calls to the {@code next()} method may throw the runtime {@link JsonException}
+     * if any transformers fail to execute.
      */
     @Override
     @SuppressWarnings("unchecked")
-    public Iterator<JsonNode> iterator() {
+    public Iterator<JsonValue> iterator() {
         if (isList()) { // optimize for list
-            return new Iterator<JsonNode>() {
+            return new Iterator<JsonValue>() {
                 int cursor = 0;
                 Iterator<Object> i = ((List)value).iterator();
                 @Override public boolean hasNext() {
                     return i.hasNext();
                 }
-                @Override public JsonNode next() {
+                @Override public JsonValue next() {
                     Object element = i.next();
-                    return new JsonNode(element, pointer.child(cursor++), transformers);
+                    return new JsonValue(element, pointer.child(cursor++), transformers);
                 }
                 @Override public void remove() {
                     throw new UnsupportedOperationException();
                 }
             };
         } else {
-            return new Iterator<JsonNode>() {
+            return new Iterator<JsonValue>() {
                 Iterator<String> i = keys().iterator();
                 @Override public boolean hasNext() {
                     return i.hasNext();
                 }
-                @Override public JsonNode next() {
+                @Override public JsonValue next() {
                     return get(i.next());
                 }
                 @Override public void remove() {
@@ -830,13 +828,13 @@ public class JsonNode implements Iterable<JsonNode> {
     }
 
     /**
-     * Returns a deep copy of the node and all of its children.
+     * Returns a deep copy of this JSON value.
      * <p>
-     * This method applies all transformations while traversing the node's children.
-     * Consequently, the resulting copy does not inherit the transformers from this node.
+     * This method applies all transformations while traversing the values's children.
+     * Consequently, the resulting copy does not inherit the transformers from this value.
      */
-    public JsonNode copy() {
-        JsonNode result = new JsonNode(value, pointer); // start with shallow copy
+    public JsonValue copy() {
+        JsonValue result = new JsonValue(value, pointer); // start with shallow copy
         if (isMap()) {
             HashMap<String, Object> map = new HashMap<String, Object>(size());
             for (String key : keys()) {
@@ -845,7 +843,7 @@ public class JsonNode implements Iterable<JsonNode> {
             result.value = map;
         } else if (isList()) {
             ArrayList<Object> list = new ArrayList<Object>(size());
-            for (JsonNode element : this) {
+            for (JsonValue element : this) {
                 list.add(element.copy().getValue()); // recursive descent
             }
             result.value = list;
@@ -854,8 +852,8 @@ public class JsonNode implements Iterable<JsonNode> {
     }
 
     /**
-     * Returns a string representation of the JSON node. This method does not
-     * apply transformations to the node's children.
+     * Returns a string representation of the JSON value. This method does not apply
+     * transformations to the value's children.
      */ 
     @Override
     public String toString() {
@@ -868,7 +866,7 @@ public class JsonNode implements Iterable<JsonNode> {
             for (Iterator<String> i = map.keySet().iterator(); i.hasNext();) {
                 String key = i.next();
                 sb.append('"').append(key).append("\": ");
-                sb.append(new JsonNode(map.get(key)).toString()); // recursive
+                sb.append(new JsonValue(map.get(key)).toString()); // recursive
                 if (i.hasNext()) {
                     sb.append(", ");
                 }
@@ -877,7 +875,7 @@ public class JsonNode implements Iterable<JsonNode> {
         } else if (isList()) {
             sb.append("[ ");
             for (Iterator<Object> i = asList().iterator(); i.hasNext();) {
-                sb.append(new JsonNode(i.next()).toString()); // recursive
+                sb.append(new JsonValue(i.next()).toString()); // recursive
                 if (i.hasNext()) {
                     sb.append(", ");
                 }

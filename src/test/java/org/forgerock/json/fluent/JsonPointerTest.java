@@ -35,20 +35,6 @@ import org.testng.annotations.Test;
  */
 public class JsonPointerTest {
 
-    /** Node encapsulating a map. */
-    private JsonNode mapNode;
-
-    /** Node encapsulating a list. */
-    private JsonNode listNode;
-
-    // ----- preparation ----------
-
-    @BeforeMethod
-    public void beforeMethod() {
-        mapNode = new JsonNode(new HashMap());
-        listNode = new JsonNode(new ArrayList());
-    }
-
     // ----- parsing unit tests ----------
 
     @Test
@@ -73,16 +59,6 @@ public class JsonPointerTest {
     }
 
     @Test
-    public void numericIndexLeadingZeroes() {
-        List<Object> list = listNode.asList();
-        list.add("a");
-        list.add("b");
-        list.add("c");
-        listNode.put(3, "d");
-        assertThat(listNode.get(new JsonPointer("/0003")).asString()).isEqualTo("d");
-    }
-
-    @Test
     public void parseVsStringChildEquality() {
         JsonPointer p1 = new JsonPointer("/a/b/c");
         JsonPointer p2 = new JsonPointer().child("a").child("b").child("c");
@@ -100,41 +76,6 @@ public class JsonPointerTest {
     public void slashEncoded() {
         JsonPointer p1 = new JsonPointer().child("a/b").child("c");
         assertThat(p1.toString()).isEqualTo("/a%2Fb/c");
-    }
-
-    // ----- manipulation unit tests ----------
-
-    @Test
-    @SuppressWarnings("unchecked")
-    public void getProperty() {
-        Map<String, Object> m = mapNode.asMap();
-        m.put("a", (m = new HashMap<String, Object>()));
-        m.put("b", (m = new HashMap<String, Object>()));
-        m.put("c", "d");
-        assertThat(mapNode.get(new JsonPointer("/a/b/c")).asString()).isEqualTo("d");
-    }
-
-    @Test
-    public void array() {
-        listNode.put(0, "x");
-        listNode.put(1, "y");
-        assertThat(listNode.get(new JsonPointer("/0")).getValue()).isEqualTo("x");
-        assertThat(listNode.get(new JsonPointer("/1")).getValue()).isEqualTo("y");
-    }
-
-    @Test
-    public void multiDimensionalArray() {
-        mapNode.put("a", new ArrayList<Object>());
-        mapNode.get("a").put(0, new ArrayList<Object>());
-        mapNode.get("a").get(0).put(0, "a00");
-        mapNode.get("a").get(0).put(1, "a01");
-        mapNode.get("a").put(1, new ArrayList<Object>());
-        mapNode.get("a").get(1).put(0, "a10");
-        mapNode.get("a").get(1).put(1, "a11");
-        assertThat(mapNode.get(new JsonPointer("/a/0/0")).getValue()).isEqualTo("a00");
-        assertThat(mapNode.get(new JsonPointer("/a/0/1")).getValue()).isEqualTo("a01");
-        assertThat(mapNode.get(new JsonPointer("/a/1/0")).getValue()).isEqualTo("a10");
-        assertThat(mapNode.get(new JsonPointer("/a/1/1")).getValue()).isEqualTo("a11");
     }
 
     // ----- exception unit tests ----------

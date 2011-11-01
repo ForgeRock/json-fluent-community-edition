@@ -38,7 +38,7 @@ public class JsonPointer implements Iterable<String> {
      * TODO: Description.
      */
     public JsonPointer() {
-        // empty tokens represents pointer to root node
+        // empty tokens represents pointer to root value
     }
 
     /**

@@ -18,49 +18,48 @@
 package org.forgerock.json.fluent;
 
 /**
- * An exception that is thrown during JSON node operations.
+ * An exception that is thrown during JSON value operations.
  *
  * @author Paul C. Bryan
  */
-public class JsonNodeException extends JsonException {
+public class JsonValueException extends JsonException {
 
     /** Serializable class a version number. */
     static final long serialVersionUID = 1L;
 
-    /** The object model node for which the exception was thrown. */
-    private final JsonNode node;
+    /** The JSON value for which the exception was thrown. */
+    private final JsonValue value;
 
     /**
-     * Constructs a new exception with the specified object model node and {@code null} as its
+     * Constructs a new exception with the specified JSON value and {@code null} as its
      * detail message.
      */
-    public JsonNodeException(JsonNode node) {
-        this.node = node;
+    public JsonValueException(JsonValue value) {
+        this.value = value;
     }
 
     /**
-     * Constructs a new exception with the specified object model node and detail message.
+     * Constructs a new exception with the specified JSON value and detail message.
      */
-    public JsonNodeException(JsonNode node, String message) {
+    public JsonValueException(JsonValue value, String message) {
         super(message);
-        this.node = node;
+        this.value = value;
     }
     
     /**
-     * Constructs a new exception with the specified object model node and cause.
+     * Constructs a new exception with the specified JSON value and cause.
      */
-    public JsonNodeException(JsonNode node, Throwable cause) {
+    public JsonValueException(JsonValue value, Throwable cause) {
         super(cause);
-        this.node = node;
+        this.value = value;
     }
 
     /**
-     * Constructs a new exception with the specified object model node, detail message and
-     * cause.
+     * Constructs a new exception with the specified JSON value, detail message and cause.
      */
-    public JsonNodeException(JsonNode node, String message, Throwable cause) {
+    public JsonValueException(JsonValue value, String message, Throwable cause) {
         super(message, cause);
-        this.node = node;
+        this.value = value;
     }
 
     /**
@@ -70,10 +69,10 @@ public class JsonNodeException extends JsonException {
     public String getMessage() {
         StringBuilder sb = new StringBuilder();
         String message = super.getMessage();
-        if (node != null) {
-            sb.append(node.getPointer().toString());
+        if (value != null) {
+            sb.append(value.getPointer().toString());
         }
-        if (node != null && message != null) {
+        if (value != null && message != null) {
             sb.append(": ");
         }
         if (message != null) {
@@ -83,9 +82,9 @@ public class JsonNodeException extends JsonException {
     }
 
     /**
-     * Returns the object model node for which the exception was thrown.
+     * Returns the JSON value for which the exception was thrown.
      */
-    public JsonNode getNode() {
-        return node;
+    public JsonValue getJsonValue() {
+        return value;
     }
 }
