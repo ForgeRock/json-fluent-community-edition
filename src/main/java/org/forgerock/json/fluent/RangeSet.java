@@ -31,7 +31,7 @@ import java.util.Set;
  */
 class RangeSet extends AbstractSet<String> implements Set<String>, Cloneable, Serializable {
 
-    /** TODO: Description. */
+    /** Establishes serialized object compatibility. */
     static final long serialVersionUID = 1L;
 
     /** The start of the range, inclusive. */

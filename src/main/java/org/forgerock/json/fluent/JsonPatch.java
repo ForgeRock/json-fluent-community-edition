@@ -23,7 +23,8 @@ import java.util.Iterator;
 import java.util.List;
 
 /**
- * TODO: Description.
+ * Processes partial modifications to JSON documents. Implements
+ * <a href="http://tools.ietf.org/html/draft-pbryan-json-patch-02">draft-pbryan-json-patch-02</a>.
  *
  * @author Paul C. Bryan
  */
@@ -33,7 +34,8 @@ public class JsonPatch {
     public static final String MEDIA_TYPE = "application/json-patch";
 
     /**
-     * TODO: Description.
+     * Returns {@code true} if the type contained by {@code v1} is different than the type
+     * contained by {@code v2}.
      * <p>
      * Note: If an unexpected (non-JSON) type is encountered, this method returns
      * {@code true}, triggering a change in the resulting patch. 
@@ -57,12 +59,12 @@ public class JsonPatch {
     }
 
     /**
-     * TODO: Description.
+     * Produces a JSON Patch operation object.
      *
-     * @param op TODO.
-     * @param pointer TODO.
-     * @param value TODO.
-     * @return TODO.
+     * @param op the operation to perform.
+     * @param pointer the JSON value to modify.
+     * @param value the JSON value to apply, or {@code null} if not applicable.
+     * @return the resulting JSON Patch operation.
      */
     private static HashMap<String, Object> op(String op, JsonPointer pointer, JsonValue value) {
         HashMap<String, Object> result = new HashMap<String, Object>();
@@ -74,10 +76,12 @@ public class JsonPatch {
     }
 
     /**
-     * TODO: Description.
+     * Compares two JSON values, and produces a JSON Patch array, which contains the
+     * operations necessary to modify the {@code v1} value to arrive at the value of
+     * {@code v2}.
      *
-     * @param v1 TODO.
-     * @param v2 TODO.
+     * @param v1 the original value.
+     * @param v2 the target value.
      * @throws NullPointerException if either of {@code v1} or {@code v2} are {@code null}.
      */
     public static JsonValue diff(JsonValue v1, JsonValue v2) {
@@ -124,28 +128,27 @@ public class JsonPatch {
     }
 
     /**
-     * Returns the operation value.
+     * Returns value of an operation.
      *
-     * @param op the patch operation containing the value.
+     * @param op the patch operation containing the value to be returned.
      * @return the value specified in the operation.
      * @throws JsonValueException if a value is not provided.
      */
     private static Object opValue(JsonValue op) throws JsonValueException {
         Object value = op.get("value").getValue();
         if (value == null && !op.isDefined("value")) { // allow explicit null value
-            throw new JsonValueException(op, "expecting value member");
+            throw new JsonValueException(op, "expecting a value member");
         }
         return value;
     }
 
     /**
-     * TODO: Description.
+     * Returns the parent value of the value identified by the JSON pointer.
      *
-     * @param op TODO.
-     * @param pointer TODO.
-     * @param target TODO.
-     * @return TODO.
-     * @throws JsonValueException TODO.
+     * @param pointer the pointer to the value whose parent value is to be returned.
+     * @param target the JSON value against which to resolve the JSON pointer.
+     * @return the parent value of the value identified by the JSON pointer.
+     * @throws JsonException if the parent value could not be found.
      */
     private static JsonValue parentValue(JsonPointer pointer, JsonValue target) throws JsonException {
         JsonValue result = null;
@@ -160,18 +163,15 @@ public class JsonPatch {
     }
 
     /**
-     * TODO: Description.
-     * <p>
-     * In event of failure, this method does not revert the changes applied up to the point
-     * of failure. If this is incompatible with your requirements, perform the patch against
-     * a copy of your object.
+     * Applies a JSON patch document to a target document. In event of a failure, this method
+     * does not revert any modifications applied up to the point of failure.
      *
-     * @param target TODO.
-     * @param diff TODO.
-     * @throws JsonValueException TODO.
+     * @param target the target document on which to apply the patch operations.
+     * @param patch the patch document specifying the modifications to apply to the target document.
+     * @throws JsonValueException if application of the patch failed.
      */
-    public static void patch(JsonValue target, JsonValue diff) throws JsonValueException {
-        for (JsonValue op : diff.required().expect(List.class)) {
+    public static void patch(JsonValue target, JsonValue patch) throws JsonValueException {
+        for (JsonValue op : patch.required().expect(List.class)) {
             JsonPointer pointer;
             if ((pointer = op.get("replace").asPointer()) != null) {
                 JsonValue parent = parentValue(pointer, target);
@@ -187,26 +187,31 @@ public class JsonPatch {
             } else if ((pointer = op.get("add").asPointer()) != null) {
                 JsonValue parent = parentValue(pointer, target);
                 if (parent == null) {
-                    throw new JsonValueException(op, "cannot add root value");
-                }
-                try {
-                    parent.add(pointer.leaf(), opValue(op));
-                } catch (JsonException je) {
-                    throw new JsonValueException(op, je);
+                    if (target.getValue() != null) {
+                        throw new JsonValueException(op, "root value already exists");
+                    }
+                    target.setValue(opValue(op));
+                } else {
+                    try {
+                        parent.add(pointer.leaf(), opValue(op));
+                    } catch (JsonException je) {
+                        throw new JsonValueException(op, je);
+                    }
                 }
             } else if ((pointer = op.get("remove").asPointer()) != null) {
                 JsonValue parent = parentValue(pointer, target);
                 String leaf = pointer.leaf();
                 if (parent == null) {
-                    throw new JsonValueException(op, "cannot remove root value");
-                }
-                if (!parent.isDefined(leaf)) {
-                    throw new JsonValueException(op, "value to remove not found");
-                }
-                try {
-                    parent.remove(leaf);
-                } catch (JsonException je) {
-                    throw new JsonValueException(op, je);
+                    parent.setValue(null);
+                } else {
+                    if (!parent.isDefined(leaf)) {
+                        throw new JsonValueException(op, "value to remove not found");
+                    }
+                    try {
+                        parent.remove(leaf);
+                    } catch (JsonException je) {
+                        throw new JsonValueException(op, je);
+                    }
                 }
             } else {
                 throw new JsonValueException(op, "expecting add, remove or replace member");
