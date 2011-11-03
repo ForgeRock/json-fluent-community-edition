@@ -23,14 +23,14 @@ import java.util.Iterator;
 import java.util.List;
 
 /**
- * Processes partial modifications to JSON documents. Implements
+ * Processes partial modifications to JSON values. Implements
  * <a href="http://tools.ietf.org/html/draft-pbryan-json-patch-02">draft-pbryan-json-patch-02</a>.
  *
  * @author Paul C. Bryan
  */
 public class JsonPatch {
 
-    /** Internet media type for JSON Patch format. */
+    /** Internet media type for the JSON Patch format. */
     public static final String MEDIA_TYPE = "application/json-patch";
 
     /**
@@ -76,58 +76,6 @@ public class JsonPatch {
     }
 
     /**
-     * Compares two JSON values, and produces a JSON Patch array, which contains the
-     * operations necessary to modify the {@code v1} value to arrive at the value of
-     * {@code v2}.
-     *
-     * @param v1 the original value.
-     * @param v2 the target value.
-     * @throws NullPointerException if either of {@code v1} or {@code v2} are {@code null}.
-     */
-    public static JsonValue diff(JsonValue v1, JsonValue v2) {
-        ArrayList<Object> result = new ArrayList<Object>();
-        if (differentTypes(v1, v2)) { // different types cause a replace
-            result.add(op("replace", v1.getPointer(), v2));
-        } else if (v1.isMap()) {
-            for (String key : v1.keys()) {
-                if (v2.isDefined(key)) { // v2 also has the property
-                    JsonValue diff = diff(v1.get(key), v2.get(key)); // recursively compare properties
-                    if (diff.size() > 0) {
-                        result.addAll(diff.asList()); // add diff results
-                    }
-                } else { // property is missing in v2
-                    result.add(op("remove", v1.getPointer().child(key), null));
-                }
-            }
-            for (String key : v2.keys()) {
-                if (!v1.isDefined(key)) { // property is in v2, not in v1
-                    result.add(op("add", v1.getPointer().child(key), v2.get(key)));
-                }
-            }
-        } else if (v1.isList()) {
-            boolean replace = false;
-            if (v1.size() != v2.size()) {
-                replace = true;
-            } else {
-                Iterator<JsonValue> i1 = v1.iterator();
-                Iterator<JsonValue> i2 = v2.iterator();
-                while (i1.hasNext() && i2.hasNext()) {
-                    if (diff(i1.next(), i2.next()).size() > 0) { // recursively compare elements
-                        replace = true;
-                        break;
-                    }
-                }
-            }
-            if (replace) { // replace list entirely
-                result.add(op("replace", v1.getPointer(), v2));
-            }
-        } else if (!v1.isNull() && !v1.getValue().equals(v2.getValue())) { // simple value comparison
-            result.add(op("replace", v1.getPointer(), v2));
-        }
-        return new JsonValue(result);
-    }
-
-    /**
      * Returns value of an operation.
      *
      * @param op the patch operation containing the value to be returned.
@@ -163,18 +111,72 @@ public class JsonPatch {
     }
 
     /**
-     * Applies a JSON patch document to a target document. In event of a failure, this method
-     * does not revert any modifications applied up to the point of failure.
+     * Compares two JSON values, and produces a JSON Patch value, which contains the
+     * operations necessary to modify the {@code original} value to arrive at the
+     * {@code target} value.
      *
-     * @param target the target document on which to apply the patch operations.
-     * @param patch the patch document specifying the modifications to apply to the target document.
+     * @param original the original value.
+     * @param target the intended target value.
+     * @return the resulting JSON Patch value.
+     * @throws NullPointerException if either of {@code original} or {@code target} are {@code null}.
+     */
+    public static JsonValue diff(JsonValue original, JsonValue target) {
+        ArrayList<Object> result = new ArrayList<Object>();
+        if (differentTypes(original, target)) { // different types cause a replace
+            result.add(op("replace", original.getPointer(), target));
+        } else if (original.isMap()) {
+            for (String key : original.keys()) {
+                if (target.isDefined(key)) { // target also has the property
+                    JsonValue diff = diff(original.get(key), target.get(key)); // recursively compare properties
+                    if (diff.size() > 0) {
+                        result.addAll(diff.asList()); // add diff results
+                    }
+                } else { // property is missing in target
+                    result.add(op("remove", original.getPointer().child(key), null));
+                }
+            }
+            for (String key : target.keys()) {
+                if (!original.isDefined(key)) { // property is in target, not in original
+                    result.add(op("add", original.getPointer().child(key), target.get(key)));
+                }
+            }
+        } else if (original.isList()) {
+            boolean replace = false;
+            if (original.size() != target.size()) {
+                replace = true;
+            } else {
+                Iterator<JsonValue> i1 = original.iterator();
+                Iterator<JsonValue> i2 = target.iterator();
+                while (i1.hasNext() && i2.hasNext()) {
+                    if (diff(i1.next(), i2.next()).size() > 0) { // recursively compare elements
+                        replace = true;
+                        break;
+                    }
+                }
+            }
+            if (replace) { // replace list entirely
+                result.add(op("replace", original.getPointer(), target));
+            }
+        } else if (!original.isNull() && !original.getValue().equals(target.getValue())) { // simple value comparison
+            result.add(op("replace", original.getPointer(), target));
+        }
+        return new JsonValue(result);
+    }
+
+    /**
+     * Applies a set of modifications in a JSON patch value to an original value, resulting
+     * in the intended target value. In the event of a failure, this method does not revert
+     * any modifications applied up to the point of failure.
+     *
+     * @param original the original value on which to apply the modifications.
+     * @param patch the JSON Patch value, specifying the modifications to apply to the original value.
      * @throws JsonValueException if application of the patch failed.
      */
-    public static void patch(JsonValue target, JsonValue patch) throws JsonValueException {
+    public static void patch(JsonValue original, JsonValue patch) throws JsonValueException {
         for (JsonValue op : patch.required().expect(List.class)) {
             JsonPointer pointer;
             if ((pointer = op.get("replace").asPointer()) != null) {
-                JsonValue parent = parentValue(pointer, target);
+                JsonValue parent = parentValue(pointer, original);
                 if (parent != null) { // replacing a child
                     String leaf = pointer.leaf();
                     if (!parent.isDefined(leaf)) {
@@ -182,15 +184,15 @@ public class JsonPatch {
                     }
                     parent.put(leaf, opValue(op));
                 } else { // replacing the root value itself
-                    target.setValue(opValue(op));
+                    original.setValue(opValue(op));
                 }
             } else if ((pointer = op.get("add").asPointer()) != null) {
-                JsonValue parent = parentValue(pointer, target);
+                JsonValue parent = parentValue(pointer, original);
                 if (parent == null) {
-                    if (target.getValue() != null) {
+                    if (original.getValue() != null) {
                         throw new JsonValueException(op, "root value already exists");
                     }
-                    target.setValue(opValue(op));
+                    original.setValue(opValue(op));
                 } else {
                     try {
                         parent.add(pointer.leaf(), opValue(op));
@@ -199,10 +201,10 @@ public class JsonPatch {
                     }
                 }
             } else if ((pointer = op.get("remove").asPointer()) != null) {
-                JsonValue parent = parentValue(pointer, target);
+                JsonValue parent = parentValue(pointer, original);
                 String leaf = pointer.leaf();
                 if (parent == null) {
-                    parent.setValue(null);
+                    original.setValue(null);
                 } else {
                     if (!parent.isDefined(leaf)) {
                         throw new JsonValueException(op, "value to remove not found");

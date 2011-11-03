@@ -44,7 +44,7 @@ import java.util.regex.PatternSyntaxException;
  */
 public class JsonValue implements Iterable<JsonValue> {
 
-    /** Transformers to apply to the JSON value; are inherited by its children. */
+    /** Transformers to apply to the value; are inherited by its children. */
     private final ArrayList<JsonTransformer> transformers = new ArrayList<JsonTransformer>();
 
     /** The pointer to the value within a JSON structure. */
@@ -127,17 +127,17 @@ public class JsonValue implements Iterable<JsonValue> {
     }
 
     /**
-     * Returns the value being wrapped by the JSON value object.
+     * Returns the underlying Java object being wrapped by the JSON value object.
      */
     public Object getValue() {
         return value;
     }
 
     /**
-     * Sets the value being wrapped by the JSON value object. This does not modify the parent
-     * value in any way; use the {@link #put(String, Object)} method to do so.
+     * Sets the underlying Java object value being wrapped by this JSON value object. This
+     * will not modify the parent value (if any).
      *
-     * @param value the value to set.
+     * @param value the underlying value to set.
      */
     public void setValue(Object value) {
         this.value = value;
