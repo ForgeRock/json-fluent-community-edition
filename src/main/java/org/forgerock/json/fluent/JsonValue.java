@@ -39,6 +39,13 @@ import java.util.regex.PatternSyntaxException;
 
 /**
  * Represents a value in a JSON structure.
+ * <p>
+ * A JSON value may have one or more transformers associated with it. Transformers apply
+ * transformations to JSON values as they are retrieved from the value. Transformers are
+ * applied iteratively, in the order they appear within the list. If a transformer affects
+ * the value, then all transformers are re-applied. This repeats until the value is no longer
+ * affected. Transformers are inherited by child values, and are applied to the child value
+ * on construction of the child {@code JsonValue} object.
  *
  * @author Paul C. Bryan
  */
@@ -55,17 +62,14 @@ public class JsonValue implements Iterable<JsonValue> {
 
     /**
      * Constructs a JSON value object with given value, pointer and transformers.
-     * <p>
-     * Transformations are applied to the value, by the transformers in the order specified
-     * in the list. Transformers are inherited by the value's children and are applied upon
-     * construction of such child {@code JsonValue} objects.
      *
      * @param value the value to wrap with the JSON value object.
      * @param pointer the pointer to the value in a JSON structure.
      * @param transformers a list of transformers to apply to values.
      * @throws JsonException if a transformer failed during value initialization.
      */
-    public JsonValue(Object value, JsonPointer pointer, Collection<? extends JsonTransformer> transformers) throws JsonException {
+    public JsonValue(Object value, JsonPointer pointer,
+    Collection<? extends JsonTransformer> transformers) throws JsonException {
         if (pointer == null) {
             pointer = new JsonPointer();
         }
@@ -108,26 +112,41 @@ public class JsonValue implements Iterable<JsonValue> {
     }
 
     /**
-     * Applies all of the transformations to the value. As each transformer is applied,
-     * all transformations are applied again recursively. This process terminates when the
-     * result of applying transformations no longer affects the value.
-     *
-     * @throws JsonException if a transformer failed to apply a transformation.
+     * Returns {@code true} if the values are === equal.
      */
-    private void transform() throws JsonException {
-        for (JsonTransformer transformer : transformers) { 
-            JsonValue jv = new JsonValue(this.value, this.pointer); // do not inherit transformers
-            transformer.transform(jv);
-            if ((this.value == null && jv.value != null) || (this.value != null && !this.value.equals(jv.value))) {
-                this.value = jv.value; // a transformation occurred; use the new value
-                transform(); // recursively iterate through all transformers using new value
-                break; // recursive call handled remaining transformations in list
-            }
-        }
+    private static boolean eq(Object v1, Object v2) {
+        return (v1 == v2 || (v1 != null && v1.equals(v2)));
     }
 
     /**
-     * Returns the underlying Java object being wrapped by the JSON value object.
+     * Applies all of the transformations to the value. If a transformer affects the value,
+     * then all transformers are re-applied. This repeats until the value is no longer
+     * affected. This method has an unreasonably high upper-limit of 2^31 iterations, after
+     * which a {@code JsonException} will be thrown.
+     *
+     * @throws JsonException if there was a failure applying transformation(s)
+     */
+    private void transform() throws JsonException {
+        Object value = this.value;
+        for (int n = 0; n < Integer.MAX_VALUE; n++) {
+            boolean affected = false;
+            for (JsonTransformer transformer : transformers) { 
+                transformer.transform(this);
+                if (!eq(value, this.value)) { // transformer affected the value
+                    value = this.value; // note the new value for next iteration
+                    affected = true;
+                    break; // reiterate all transformers
+                }
+            }
+            if (!affected) { // full iteration of transformers without affecting value
+                return; // success
+            }
+        }
+        throw new JsonException("transformer iteration overflow");
+    }
+
+    /**
+     * Returns the underlying Java object being wrapped by this JSON value object.
      */
     public Object getValue() {
         return value;
@@ -135,7 +154,7 @@ public class JsonValue implements Iterable<JsonValue> {
 
     /**
      * Sets the underlying Java object value being wrapped by this JSON value object. This
-     * will not modify the parent value (if any).
+     * will not modify any parent value.
      *
      * @param value the underlying value to set.
      */
@@ -144,23 +163,23 @@ public class JsonValue implements Iterable<JsonValue> {
 
     }
     /**
-     * Returns the pointer of the JSON value in the JSON structure.
+     * Returns the pointer of the JSON value in its JSON structure.
      */
     public JsonPointer getPointer() {
         return pointer;
     }
 
     /**
-     * Returns the JSON value's list of transformers. The list is modifiable; child values
-     * shall inherit the modified list.
+     * Returns the JSON value's modifiable list of transformers. Child values inherit this
+     * list when they are constructed.
      */
     public List<JsonTransformer> getTransformers() {
         return transformers;
     }
 
     /**
-     * Adds and applies a transformer to the value. This results in applying all other
-     * transformations to the value.
+     * Adds a transformer to the transformer list, and applies all transformers to the value,
+     * in the order listed.
      *
      * @param transformer the transformer to add.
      * @return this JSON value.
@@ -173,14 +192,15 @@ public class JsonValue implements Iterable<JsonValue> {
     }
 
     /**
-     * Adds and applies a collection of transformers to the value. This results in applying
-     * all other transformations to the value
+     * Adds a collection of transformers to the list, and applies all transformers to the
+     * value, in the order listed.
      *
      * @param transformers the transformers to add.
      * @return this JSON value.
      * @throws JsonException if a transformer failed to apply a transformation.
      */
-    public JsonValue addTransformers(Collection<? extends JsonTransformer> transformers) {
+    public JsonValue addTransformers(Collection<? extends JsonTransformer> transformers)
+    throws JsonException {
         this.transformers.addAll(transformers);
         transform();
         return this;

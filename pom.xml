@@ -61,7 +61,7 @@
                 <configuration>
                     <instructions>
                         <Import-Package>*</Import-Package>
-                        <Export-Package>org.forgerock.json.fluent</Export-Package>
+                        <Export-Package>org.forgerock.json.fluent;version=${project.version}</Export-Package>
                     </instructions>
                 </configuration>
             </plugin>
@@ -93,14 +93,6 @@
             <snapshots>
                 <enabled>false</enabled>
             </snapshots>
-        </repository>
-        <repository>
-            <id>forgerock-snapshots-repository</id>
-            <name>ForgeRock Snapshot Repository</name>
-            <url>http://maven.forgerock.org/repo/snapshots</url>
-            <releases>
-                <enabled>false</enabled>
-            </releases>
         </repository>
     </repositories>
 <!-- /may-be-temporary -->
