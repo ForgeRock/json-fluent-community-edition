@@ -17,7 +17,7 @@
 
 package org.forgerock.json.fluent;
 
-// Java Standard Edition
+// Java SE
 import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -38,130 +38,160 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 /**
- * Represents a value in a JSON structure.
+ * Represents a value in a JSON object model structure. JSON values are represented with
+ * standard Java objects: {@link String}, {@link Number}, {@link Map}, {@link List},
+ * {@link Boolean} and {@code null}. 
  * <p>
  * A JSON value may have one or more transformers associated with it. Transformers apply
- * transformations to JSON values as they are retrieved from the value. Transformers are
- * applied iteratively, in the order they appear within the list. If a transformer affects
- * the value, then all transformers are re-applied. This repeats until the value is no longer
- * affected. Transformers are inherited by child values, and are applied to the child value
- * on construction of the child {@code JsonValue} object.
+ * transformations to the JSON value upon construction, and upon members as they are retrieved.
+ * Transformers are applied iteratively, in the sequence they appear within the list. If a
+ * transformer affects the value, then all transformers are re-applied, in sequence. This
+ * repeats until the value is no longer affected. Transformers are inherited by and applied
+ * to member values.
  *
  * @author Paul C. Bryan
  */
 public class JsonValue implements Iterable<JsonValue> {
 
-    /** Transformers to apply to the value; are inherited by its children. */
+    /** Transformers to apply to the value; are inherited by its members. */
     private final ArrayList<JsonTransformer> transformers = new ArrayList<JsonTransformer>();
 
     /** The pointer to the value within a JSON structure. */
-    private final JsonPointer pointer;
+    private JsonPointer pointer;
 
-    /** The raw value being wrapped by this JSON value. */
-    private Object value;
+    /** The Java object representing this JSON value. */
+    private Object object;
 
     /**
-     * Constructs a JSON value object with given value, pointer and transformers.
+     * Unwraps a {@link JsonValueWrapper} and/or {@link JsonValue} object. If nothing was
+     * unwrapped, then {@code null} is returned.
+     */
+    private JsonValue unwrapObject(Object object) {
+        JsonValue result = null;
+        if (object instanceof JsonValueWrapper) {
+            object = ((JsonValueWrapper)object).unwrap();
+        }
+        if (object instanceof JsonValue) {
+            result = (JsonValue)object;
+        }
+        return result;
+    }
+
+    /**
+     * Constructs a JSON value object with given object, pointer and transformers.
      *
-     * @param value the value to wrap with the JSON value object.
+     * This constructor will automatically unwrap any {@link JsonValueWrapper} and/or
+     * {@link JsonValue} objects. The pointer is inherited from the wrapped value, except
+     * if {@code pointer} is not {@code null}. The transformers are inherited from the
+     * wrapped value, except if {@code transformers} is not {@code null}. 
+     *
+     * @param object the Java object representing the JSON value.
      * @param pointer the pointer to the value in a JSON structure.
-     * @param transformers a list of transformers to apply to values.
+     * @param transformers a list of transformers to apply the value and its members.
      * @throws JsonException if a transformer failed during value initialization.
      */
-    public JsonValue(Object value, JsonPointer pointer,
+    public JsonValue(Object object, JsonPointer pointer,
     Collection<? extends JsonTransformer> transformers) throws JsonException {
-        if (pointer == null) {
-            pointer = new JsonPointer();
-        }
-        this.value = value;
+        this.object = object;
         this.pointer = pointer;
         if (transformers != null) {
             this.transformers.addAll(transformers);
         }
-        transform(); // apply transformations
+        JsonValue jv = unwrapObject(object);
+        if (jv != null) {
+            this.object = jv.object;
+            if (pointer == null) {
+                this.pointer = jv.pointer;
+            }
+            if (transformers == null) {
+                this.transformers.addAll(jv.transformers);
+            }
+        }
+        if (this.pointer == null) {
+            this.pointer = new JsonPointer();
+        }
+        if (transformers != null) {
+            applyTransformers();
+        }
     }
 
     /**
-     * Constructs a JSON value object with a given value and pointer.
+     * Constructs a JSON value object with a given object and transformers.
+     * This constructor will automatically unwrap any {@link JsonValueWrapper} and/or
+     * {@link JsonValue} objects.
      *
-     * @param value the value to wrap with the JSON value object.
+     * @param object the Java object representing the JSON value.
+     * @param transformers a list of transformers to apply the value and its members.
+     * @throws JsonException if a transformer failed during value initialization.
+     */
+    public JsonValue(Object object, Collection<? extends JsonTransformer> transformers) {
+        this(object, null, transformers);
+    }
+
+    /**
+     * Constructs a JSON value object with a given object and pointer.
+     * This constructor will automatically unwrap any {@link JsonValueWrapper} and/or
+     * {@link JsonValue} objects.
+     *
+     * @param object the Java object representing the JSON value.
      * @param pointer the pointer to the value in a JSON structure.
      */
-    public JsonValue(Object value, JsonPointer pointer) {
-        this(value, pointer, null);
+    public JsonValue(Object object, JsonPointer pointer) {
+        this(object, pointer, null);
     }
 
     /**
-     * Constructs a JSON value object with a given value.
-     * <p>
-     * If the provided value is an instance of {@code JsonValue}, then this constructor makes
-     * a shallow copy of its members.
+     * Constructs a JSON value object with a given object.
+     * This constructor will automatically unwrap any {@link JsonValueWrapper} and/or
+     * {@link JsonValue} objects.
      *
-     * @param value the value to wrap with the JSON value object.
+     * @param object the Java object representing JSON value.
      */
-    public JsonValue(Object value) {
-        if (value != null && value instanceof JsonValue) { // make shallow copy
-            JsonValue jv = (JsonValue)value;
-            this.value = jv.value;
-            this.pointer = jv.pointer;
-            this.transformers.addAll(jv.transformers);
+    public JsonValue(Object object) {
+        this(object, null, null);
+    }
+
+    /**
+     * Returns the raw Java object representing this JSON value.
+     */
+    public Object getObject() {
+        return object;
+    }
+
+    /**
+     * Returns a Java object representing this JSON value. If the object is a {@code Map} or
+     * {@code List}, it is wrapped with a {@link JsonValueMap} or {@link JsonValueList}
+     * object respectively. This maintains and applies transformations as these objects
+     * (and their children) are accessed.
+     */
+    public Object getWrappedObject() {
+        if (isMap()) {
+            return new JsonValueMap(this);
+        } else if (isList()) {
+            return new JsonValueList(this);
         } else {
-            this.value = value;
-            pointer = new JsonPointer();
+            return object;
         }
     }
 
     /**
-     * Returns {@code true} if the values are === equal.
-     */
-    private static boolean eq(Object v1, Object v2) {
-        return (v1 == v2 || (v1 != null && v1.equals(v2)));
-    }
-
-    /**
-     * Applies all of the transformations to the value. If a transformer affects the value,
-     * then all transformers are re-applied. This repeats until the value is no longer
-     * affected. This method has an unreasonably high upper-limit of 2^31 iterations, after
-     * which a {@code JsonException} will be thrown.
+     * Sets the Java object representing this JSON value. Does not apply transformers to
+     * the new value.
+     * <p>
+     * This method will automatically unwrap any {@link JsonValueWrapper} and/or
+     * {@link JsonValue} objects. Neither the pointer nor the transformers are inherited from
+     * the wrapped value. No transformers are applied to the wrapped value's items. 
      *
-     * @throws JsonException if there was a failure applying transformation(s)
+     * @param object the object to set.
      */
-    private void transform() throws JsonException {
-        Object value = this.value;
-        for (int n = 0; n < Integer.MAX_VALUE; n++) {
-            boolean affected = false;
-            for (JsonTransformer transformer : transformers) { 
-                transformer.transform(this);
-                if (!eq(value, this.value)) { // transformer affected the value
-                    value = this.value; // note the new value for next iteration
-                    affected = true;
-                    break; // reiterate all transformers
-                }
-            }
-            if (!affected) { // full iteration of transformers without affecting value
-                return; // success
-            }
+    public void setObject(Object object) {
+        this.object = object;
+        JsonValue jv = unwrapObject(object);
+        if (jv != null) {
+            this.object = jv.object;
         }
-        throw new JsonException("transformer iteration overflow");
     }
 
-    /**
-     * Returns the underlying Java object being wrapped by this JSON value object.
-     */
-    public Object getValue() {
-        return value;
-    }
-
-    /**
-     * Sets the underlying Java object value being wrapped by this JSON value object. This
-     * will not modify any parent value.
-     *
-     * @param value the underlying value to set.
-     */
-    public void setValue(Object value) {
-        this.value = value;
-
-    }
     /**
      * Returns the pointer of the JSON value in its JSON structure.
      */
@@ -170,40 +200,48 @@ public class JsonValue implements Iterable<JsonValue> {
     }
 
     /**
-     * Returns the JSON value's modifiable list of transformers. Child values inherit this
-     * list when they are constructed.
+     * Returns the JSON value's list of transformers. This list is modifiable. Child values
+     * inherit the list when they are constructed. If any transformers are added to the
+     * list, call the {@link #applyTransformers()} method to apply them to the current value.
      */
     public List<JsonTransformer> getTransformers() {
         return transformers;
     }
 
     /**
-     * Adds a transformer to the transformer list, and applies all transformers to the value,
-     * in the order listed.
-     *
-     * @param transformer the transformer to add.
-     * @return this JSON value.
-     * @throws JsonException if a transformer failed to apply a transformation.
+     * Returns {@code true} if the values are === equal.
      */
-    public JsonValue addTransformer(JsonTransformer transformer) throws JsonException {
-        transformers.add(transformer);
-        transform();
-        return this;
+    private static boolean eq(Object o1, Object o2) {
+        return (o1 == o2 || (o1 != null && o1.equals(o2)));
     }
 
     /**
-     * Adds a collection of transformers to the list, and applies all transformers to the
-     * value, in the order listed.
+     * Applies all of the transformations to the value. If a transformer affects the value,
+     * then all transformers are re-applied. This repeats until the value is no longer
+     * affected.
+     * <p>
+     * This method has an absurdly high upper-limit of {@link Integer#MAX_VALUE} iterations,
+     * beyond which a {@code JsonException} will be thrown.
      *
-     * @param transformers the transformers to add.
-     * @return this JSON value.
-     * @throws JsonException if a transformer failed to apply a transformation.
+     * @throws JsonException if there was a failure applying transformation(s)
      */
-    public JsonValue addTransformers(Collection<? extends JsonTransformer> transformers)
-    throws JsonException {
-        this.transformers.addAll(transformers);
-        transform();
-        return this;
+    public void applyTransformers() throws JsonException {
+        Object object = this.object;
+        for (int n = 0; n < Integer.MAX_VALUE; n++) {
+            boolean affected = false;
+            for (JsonTransformer transformer : transformers) { 
+                transformer.transform(this);
+                if (!eq(object, this.object)) { // transformer affected the value
+                    object = this.object; // note the new value for next iteration
+                    affected = true;
+                    break; // reiterate all transformers
+                }
+            }
+            if (!affected) { // full iteration of transformers without affecting value
+                return; // success
+            }
+        }
+        throw new JsonException("Transformer iteration overflow");
     }
 
     /**
@@ -213,8 +251,8 @@ public class JsonValue implements Iterable<JsonValue> {
      * @return this JSON value.
      */
     public JsonValue required() throws JsonValueException {
-        if (value == null) {
-            throw new JsonValueException(this, "expecting a value");
+        if (object == null) {
+            throw new JsonValueException(this, "Expecting a value");
         }
         return this;
     }
@@ -228,8 +266,8 @@ public class JsonValue implements Iterable<JsonValue> {
      * @throws JsonValueException if the value is not the specified type.
      */
     public JsonValue expect(Class type) throws JsonValueException {
-        if (value != null && !type.isInstance(value)) {
-            throw new JsonValueException(this, "expecting " + type.getName());
+        if (object != null && !type.isInstance(object)) {
+            throw new JsonValueException(this, "Expecting a " + type.getName());
         }
         return this;
     }
@@ -238,7 +276,7 @@ public class JsonValue implements Iterable<JsonValue> {
      * Returns {@code true} if the JSON value is a {@link Map}.
      */
     public boolean isMap() {
-        return (value != null && value instanceof Map);
+        return (object != null && object instanceof Map);
     }
 
     /**
@@ -246,50 +284,18 @@ public class JsonValue implements Iterable<JsonValue> {
      * method returns {@code null}.
      *
      * @return the map value, or {@code null} if no value.
-     * @throws JsonValueException if the JSON value is not a {@code Map} or contains non-{@code String} keys.
+     * @throws JsonValueException if the JSON value is not a {@code Map}.
      */
     @SuppressWarnings("unchecked")
     public Map<String, Object> asMap() throws JsonValueException {
-        Map result = (value == null ? null : ((Map)expect(Map.class).value));
-        if (result != null) {
-            for (Object key : result.keySet()) {
-                if (key == null || !(key instanceof String)) {
-                    throw new JsonValueException(this, "non-string key encountered in map");
-                }
-            }
-        }
-        return result; 
-    }
-
-    /**
-     * Returns the JSON value as a {@link Map} containing objects of the specified type. If
-     * the value is {@code null}, this method returns {@code null}. If any of the entries
-     * in the map are not {@code null} and not of the specified type,
-     * {@code JsonValueException} is thrown.
-     *
-     * @param type the type of object that all entries in the map are expected to be.
-     * @return the map value, or {@code} null if no value.
-     * @throws JsonValueException if the JSON value is not a {@code Map} or contains an unexpected type.
-     */
-    @SuppressWarnings("unchecked")
-    public <V> Map<String, V> asMap(Class<V> type) throws JsonValueException {
-        Map<String, Object> map = asMap();
-        if (map != null) {
-            for (String key : map.keySet()) {
-                Object value = map.get(key);
-                if (value != null && !type.isInstance(value)) {
-                    throw new JsonValueException(this, "expecting " + type.getName() + " entries");
-                }
-            }
-        }
-        return (Map)map;
+        return (object == null ? null : (Map)(expect(Map.class).object));
     }
 
     /**
      * Returns {@code true} if the JSON value is a {@link List}.
      */
     public boolean isList() {
-        return (value != null && value instanceof List);
+        return (object != null && object instanceof List);
     }
 
     /**
@@ -299,9 +305,8 @@ public class JsonValue implements Iterable<JsonValue> {
      * @return the list value, or {@code} null if no value.
      * @throws JsonValueException if the JSON value is not a {@code List}.
      */
-    @SuppressWarnings("unchecked")
     public List<Object> asList() throws JsonValueException {
-        return (value == null ? null : ((List)expect(List.class).value));
+        return asList(Object.class);
     }
 
     /**
@@ -313,25 +318,29 @@ public class JsonValue implements Iterable<JsonValue> {
      * @param type the type of object that all elements are expected to be.
      * @return the list value, or {@code} null if no value.
      * @throws JsonVaueException if the JSON value is not a {@code List} or contains an unexpected type.
+     * @throws NullPointerException if {@code type} is {@code null}.
      */
     @SuppressWarnings("unchecked")
     public <E> List<E> asList(Class<E> type) throws JsonValueException {
-        List list = asList(); // expects a list type
-        if (list != null) {
-            for (Object value : list) {
-                if (value != null && !type.isInstance(value)) {
-                    throw new JsonValueException(this, "expecting " + type.getName() + " elements");
+        if (object != null) {
+            expect(List.class);
+            if (type != Object.class) {
+                List<Object> list = (List)this.object;
+                for (Object element : list) {
+                    if (element != null && !type.isInstance(element)) {
+                        throw new JsonValueException(this, "Expecting a List of " + type.getName() + " elements");
+                    }
                 }
             }
         }
-        return list;
+        return (List)object;
     }
 
     /**
      * Returns {@code true} if the JSON value is a {@link String}.
      */
     public boolean isString() {
-        return (value != null && value instanceof String);
+        return (object != null && object instanceof String);
     }
 
     /**
@@ -342,14 +351,14 @@ public class JsonValue implements Iterable<JsonValue> {
      * @throws JsonValueException if the JSON value is not a string.
      */
     public String asString() throws JsonValueException {
-        return (value == null ? null : ((String)expect(String.class).value));
+        return (object == null ? null : (String)(expect(String.class).object));
     }
 
     /**
      * Returns {@code true} if the JSON value is a {@link Number}.
      */
     public boolean isNumber() {
-        return (value != null && value instanceof Number);
+        return (object != null && object instanceof Number);
     }
 
     /**
@@ -360,7 +369,7 @@ public class JsonValue implements Iterable<JsonValue> {
      * @throws JsonValueException if the JSON value is not a number.
      */
     public Number asNumber() throws JsonValueException {
-        return (value == null ? null : (Number)expect(Number.class).value);
+        return (object == null ? null : (Number)(expect(Number.class).object));
     }
 
     /**
@@ -371,7 +380,7 @@ public class JsonValue implements Iterable<JsonValue> {
      * @throws JsonValueException if the JSON value is not a number.
      */
     public Integer asInteger() throws JsonValueException {
-        return (value == null ? null : Integer.valueOf(asNumber().intValue()));
+        return (object == null ? null : Integer.valueOf(asNumber().intValue()));
     }
 
     /**
@@ -382,7 +391,7 @@ public class JsonValue implements Iterable<JsonValue> {
      * @throws JsonValueException if the JSON value is not a number.
      */
     public Double asDouble() throws JsonValueException {
-        return (value == null ? null : Double.valueOf(asNumber().doubleValue()));
+        return (object == null ? null : Double.valueOf(asNumber().doubleValue()));
     }
 
     /**
@@ -393,14 +402,14 @@ public class JsonValue implements Iterable<JsonValue> {
      * @throws JsonValueException if the JSON value is not a number.
      */
     public Long asLong() throws JsonValueException {
-        return (value == null ? null : Long.valueOf(asNumber().longValue()));
+        return (object == null ? null : Long.valueOf(asNumber().longValue()));
     }
 
     /**
      * Returns {@code true} if the JSON value is a {@link Boolean}.
      */
     public boolean isBoolean() {
-        return (value != null && value instanceof Boolean);
+        return (object != null && object instanceof Boolean);
     }
 
     /**
@@ -411,38 +420,49 @@ public class JsonValue implements Iterable<JsonValue> {
      * @throws JsonValueException if the JSON value is not a boolean type.
      */
     public Boolean asBoolean() throws JsonValueException {
-        return (value == null ? null : (Boolean)expect(Boolean.class).value);
+        return (object == null ? null : (Boolean)(expect(Boolean.class).object));
     }
 
     /**
      * Returns {@code true} if the value is {@code null}.
      */
     public boolean isNull() {
-        return (value == null);
+        return (object == null);
     }
 
     /**
      * Returns the JSON string value as an enum constant of the specified enum type.
+     * The string value and enum constants are compared, ignoring case considerations.
      * If the JSON value is {@code null}, this method returns {@code null}.
      *
      * @param type the enum type to match constants with the value.
      * @return the enum constant represented by the string value.
+     * @throws IllegalArgumentException if {@code type} does not represent an enum type.
      * @throws JsonValueException if the JSON value does not match any of the enum's constants.
      * @throws NullPointerException if {@code type} is {@code null}.
      */
     public <T extends Enum<T>> T asEnum(Class<T> type) throws JsonValueException {
-        if (type == null) {
-            throw new NullPointerException();
-        }
-        try {
-            return (value == null ? null : Enum.valueOf(type, asString().toUpperCase()));
-        } catch (IllegalArgumentException iae) {
-            StringBuilder sb = new StringBuilder("Expecting one of:");
-            for (Object constant : type.getEnumConstants()) {
-                sb.append(constant.toString()).append(' ');
+        T result = null;
+        String string = asString();
+        if (string != null) {
+            T[] constants = type.getEnumConstants();
+            if (constants == null) {
+                throw new IllegalArgumentException("Type is not an enum class");
             }
-            throw new JsonValueException(this, sb.toString());
+            for (T constant : constants) {
+                if (string.equalsIgnoreCase(constant.toString())) {
+                    result = constant;
+                    break;
+                }
+            }
+            if (result == null) {
+                StringBuilder sb = new StringBuilder("Expecting String containing one of:");
+                for (T constant :constants) {
+                    sb.append(' ').append(constant.toString());
+                }
+            }
         }
+        return result;
     }
 
     /**
@@ -453,8 +473,8 @@ public class JsonValue implements Iterable<JsonValue> {
      * @throws JsonValueException if the JSON value is not a string.
      */
     public File asFile() throws JsonValueException {
-        String s = asString();
-        return (s != null ? new File(s) : null);
+        String string = asString();
+        return (string != null ? new File(string) : null);
     }
 
     /**
@@ -466,7 +486,7 @@ public class JsonValue implements Iterable<JsonValue> {
      */
     public Charset asCharset() throws JsonValueException {
         try {
-            return (value == null ? null : Charset.forName(asString()));
+            return (object == null ? null : Charset.forName(asString()));
         } catch (IllegalCharsetNameException icne) {
             throw new JsonValueException(this, icne);
         } catch (UnsupportedCharsetException uce) {
@@ -483,7 +503,7 @@ public class JsonValue implements Iterable<JsonValue> {
      */
     public Pattern asPattern() throws JsonValueException {
         try {
-            return (value == null ? null : Pattern.compile(asString()));
+            return (object == null ? null : Pattern.compile(asString()));
         } catch (PatternSyntaxException pse) {
             throw new JsonValueException(this, pse);
         }
@@ -498,12 +518,11 @@ public class JsonValue implements Iterable<JsonValue> {
      */
     public URI asURI() throws JsonValueException {
         try {
-            return (value == null ? null : new URI(asString()));
+            return (object == null ? null : new URI(asString()));
         } catch (URISyntaxException use) {
             throw new JsonValueException(this, use);
         }
     }
-
 
     /**
      * Returns the JSON string value as a JSON pointer. If the JSON value is {@code null},
@@ -514,7 +533,7 @@ public class JsonValue implements Iterable<JsonValue> {
      */
     public JsonPointer asPointer() throws JsonValueException {
         try {
-            return (value == null ? null : new JsonPointer(asString()));
+            return (object == null ? null : new JsonPointer(asString()));
         } catch (JsonException je) {
             throw (je instanceof JsonValueException ? je : new JsonValueException(this, je));
         }
@@ -523,18 +542,31 @@ public class JsonValue implements Iterable<JsonValue> {
     /**
      * Defaults the JSON value to the specified value if it is currently {@code null}.
      *
-     * @param value the string to default to.
+     * @param object the object to default to.
      * @return this JSON value or a new JSON value containing the default value.
      */
-    public JsonValue defaultTo(Object value) {
-        return (this.value != null ? this : new JsonValue(value, pointer, transformers));
+    public JsonValue defaultTo(Object object) {
+        return (this.object != null ? this : new JsonValue(object, this.pointer, this.transformers));
+    }
+
+    /**
+     * Returns the number of values that this JSON value contains.
+     */
+    public int size() {
+        int result = 0;
+        if (isMap()) {
+            result = asMap().size();
+        } else if (isList()) {
+            result = asList().size();
+        }
+        return result;
     }
 
     /**
      * Returns the key as an list index value. If the string does not represent a valid
      * list index value, then {@code -1} is returned.
      *
-     * @param key the string key to be converted into an list index value.
+     * @param key the key to be converted into an list index value.
      * @return the converted index value, or {@code -1} if invalid.
      */
     private static int toIndex(String key) {
@@ -544,41 +576,57 @@ public class JsonValue implements Iterable<JsonValue> {
         } catch (NumberFormatException nfe) {
             result = -1;
         }
-        return (result < 0 ? -1 : result);
+        return (result >= 0 ? result : -1);
     }
 
     /**
-     * Returns {@code true} if the specified child value is defined within this JSON value.
-     *
-     * @param key the {@code Map} key or {@code List} index of the child value to seek.
-     * @return {@code true} if this JSON value contains the specified child.
+     * Returns {@code true} if this JSON value contains the specified item.
+     * 
+     * @param key the {@code Map} key or {@code List} index of the item to seek.
+     * @return {@code true} if this JSON value contains the specified member.
      * @throws NullPointerException if {@code key} is {@code null}.
      */
     public boolean isDefined(String key) {
+        boolean result = false;
         if (isMap()) {
-            return ((Map)value).containsKey(key);
+            result = asMap().containsKey(key);
         } else if (isList()) {
             int index = toIndex(key);
-            return (index >= 0 && index < ((List)value).size());
-        } else {
-            return false;
+            result = (index >= 0 && index < asList().size());
         }
+        return result;
     }
 
     /**
-     * Returns the specified child JSON value. If no such child value exists, then a JSON value
+     * Returns {@code true} this JSON value contains an item with the specified value.
+     *
+     * @param object the object to seek within this JSON value.
+     * @return {@code true} if this value contains the specified member value. 
+     */
+    public boolean contains(Object object) {
+        boolean result = false;
+        if (isMap()) {
+            result = asMap().containsValue(object);
+        } else if (isList()) {
+            result = asList().contains(object);
+        }
+        return result;
+    }
+
+    /**
+     * Returns the specified item value. If no such member value exists, then a JSON value
      * containing {@code null} is returned.
      *
-     * @param key the {@code Map} key or {@code List} index identifying the child value to return.
-     * @return the child value, or a JSON value containing {@code null}.
+     * @param key the {@code Map} key or {@code List} index identifying the item to return.
+     * @return a JSON value containing the value or {@code null}.
      * @throws JsonException if a transformer failed to transform the child value.
      */
     public JsonValue get(String key) throws JsonException {
         Object result = null;
         if (isMap()) {
-            result = ((Map)value).get(key);
+            result = asMap().get(key);
         } else if (isList()) {
-            List list = (List)value;
+            List<Object> list = asList();
             int index = toIndex(key);
             if (index >= 0 && index < list.size()) {
                 result = list.get(index);
@@ -593,39 +641,39 @@ public class JsonValue implements Iterable<JsonValue> {
      *
      * @param index index of child element value to return.
      * @return the child value, or a JSON value containing {@code null}.
-     * @throws IndexOutOfBoundsException if {@code index} is negative.
+     * @throws JsonValueException if index is negative.
      * @throws JsonException if a transformer failed to transform the child value.
      */
     public JsonValue get(int index) throws JsonException {
+        Object result = null;
         if (index < 0) {
-            throw new IndexOutOfBoundsException();
+            throw new JsonValueException(this, "List index out of range: " + index);
         }
-        Object child = null;
-        if (isList()) {
-            List list = (List)value;
+        if (isList() && index >= 0) {
+            List<Object> list = asList();
             if (index < list.size()) {
-                child = list.get(index);
+                result = list.get(index);
             }
         }
-        return new JsonValue(child, pointer.child(index), transformers);
+        return new JsonValue(result, pointer.child(index), transformers);
     }
      
     /**
-     * Returns the specified child value. If the specified child value does not exist, then
-     * {@code null} is returned.
+     * Returns the specified child value with a pointer, relative to this value as root.
+     * If the specified child value does not exist, then {@code null} is returned.
      *
      * @param pointer the JSON pointer identifying the child value to return.
      * @return the child value, or {@code null} if no such value exists.
-     * @throws JsonException if a transformer failed to transform the child value.
+     * @throws JsonException if a transformer failed to transform the resulting value.
      */
     public JsonValue get(JsonPointer pointer) throws JsonException {
         JsonValue result = this;
         for (String token : pointer) {
-            JsonValue child = result.get(token);
-            if (child.isNull() && !result.isDefined(token)) {
+            JsonValue member = result.get(token);
+            if (member.isNull() && !result.isDefined(token)) {
                 return null; // undefined value yields null, not a JSON value containing null
             }
-            result = child;
+            result = member;
         }
         return result;
     }
@@ -633,24 +681,24 @@ public class JsonValue implements Iterable<JsonValue> {
     /**
      * Sets the value of the specified member.
      * <p>
-     * If setting a list element, the specified key must be parseable as an unsigned  base-10
-     * integer and be less than or equal to the size of the list.
+     * If setting a list element, the specified key must be parseable as an unsigned
+     * base-10 integer and be less than or equal to the size of the list.
      *
      * @param key the {@code Map} key or {@code List} index identifying the child value to set.
-     * @param value the value to assign to the child member.
+     * @param object the object value to assign to the member.
      * @throws JsonValueException if this JSON value is not a {@code Map} or {@code List}.
      * @throws NullPointerException if {@code key} is {@code null}.
      */
-    public void put(String key, Object value) throws JsonValueException {
+    public void put(String key, Object object) throws JsonValueException {
         if (key == null) {
             throw new NullPointerException();
         }
         if (isMap()) {
-            asMap().put(key, value);
+            asMap().put(key, object);
         } else if (isList()) {
-            put(toIndex(key), value);
+            put(toIndex(key), object);
         } else {
-            throw new JsonValueException(this, "expecting Map or List");
+            throw new JsonValueException(this, "Expecting a Map or List");
         }
     }
 
@@ -658,36 +706,36 @@ public class JsonValue implements Iterable<JsonValue> {
      * Sets the value of the specified child list element.
      *
      * @param index the {@code List} index identifying the child value to set.
-     * @param value the value to assign to the list element.
-     * @throws JsonValueException if this JSON value is not a {@code List}.
+     * @param object the Java value to assign to the list element.
+     * @throws JsonValueException if this JSON value is not a {@code List} or index is out of range.
      */
-    public void put(int index, Object value) throws JsonValueException {
+    public void put(int index, Object object) throws JsonValueException {
         List<Object> list = required().asList();
         if (index < 0 || index > list.size()) {
-            throw new JsonValueException(this, "index out of range");
+            throw new JsonValueException(this, "List index out of range: " + index);
         } else if (index == list.size()) { // appending to end of list
-            list.add(value);
+            list.add(object);
         } else { // replacing existing element
-            list.set(index, value);
+            list.set(index, object);
         }
     }
 
     /**
-     * Sets the value of the value identified by the specified pointer. If doing so would
-     * require the creation of a new object or list, a {@code JsonValueException} will be
-     * thrown.
+     * Sets the value of the value identified by the specified pointer, relative to this value
+     * as root. If doing so would require the creation of a new object or list, a
+     * {@code JsonValueException} will be thrown.
      *
      * @param pointer identifies the child value to set.
-     * @param value the value to set.
+     * @param object the Java object value to set.
      * @throws JsonValueException if the specified pointer is invalid.
      */
-    public void put(JsonPointer pointer, Object value) throws JsonValueException {
+    public void put(JsonPointer pointer, Object object) throws JsonValueException {
         JsonValue jv = this;
         String[] tokens = pointer.toArray();
         for (int n = 0; n < tokens.length -1; n++) {
             jv = jv.get(tokens[n]).required();
         }
-        jv.put(tokens[tokens.length - 1], value);
+        jv.put(tokens[tokens.length - 1], object);
     }
 
     /**
@@ -698,7 +746,7 @@ public class JsonValue implements Iterable<JsonValue> {
      */
     public void remove(String key) {
         if (isMap()) {
-            ((Map)value).remove(key);
+            asMap().remove(key);
         } else if (isList()) {
             remove(toIndex(key));
         }
@@ -710,53 +758,13 @@ public class JsonValue implements Iterable<JsonValue> {
      *
      * @param index the {@code List} index identifying the child value to remove.
      */
+    @SuppressWarnings("unchecked")
     public void remove(int index) {
         if (index >= 0 && isList()) {
-            List list = (List)value;
+            List<Object> list = asList();
             if (index < list.size()) {
                 list.remove(index);
             }
-        }
-    }
-
-    /**
-     * Adds the specified value.
-     * <p>
-     * If adding to a list value, the specified key must be parseable as an unsigned
-     * base-10 integer and be less than or equal to the list size. Adding a value to a list
-     * shifts any existing elements at or above the specified index to the right by one.
-     *
-     * @param key the {@code Map} key or {@code List} index to add.
-     * @param value the value to add.
-     * @throws JsonValueException if not a {@code Map} or {@code List}, the {@code Map} key already exists, or the {@code List} index is out of range.
-     */
-    public void add(String key, Object value) throws JsonValueException {
-        if (isMap()) {
-            if (isDefined(key)) {
-                throw new JsonValueException(this, key + " already exists");
-            }
-            asMap().put(key, value);
-        } else if (isList()) {
-            add(toIndex(key), value);
-        } else {
-            throw new JsonValueException(this, "expecting Map or List");
-        }
-    }
-
-    /**
-     * Adds the specified value to the list. Adding a value to a list shifts any existing
-     * elements at or above the specified index to the right by one.
-     *
-     * @param index the {@code List} index of the value to add.
-     * @param value the value to add.
-     * @throws JsonValueException if this JSON value is not a {@code List} or index is out of range.
-     */
-    public void add(int index, Object value) throws JsonValueException {
-        List<Object> list = required().asList();
-        if (index < 0 || index > list.size()) {
-            throw new JsonValueException(this, "index out of range");
-        } else {
-            list.add(index, value);
         }
     }
 
@@ -772,16 +780,44 @@ public class JsonValue implements Iterable<JsonValue> {
     }
 
     /**
-     * Returns the number of child values that this JSON value contains.
+     * Adds the specified value.
+     * <p>
+     * If adding to a list value, the specified key must be parseable as an unsigned
+     * base-10 integer and be less than or equal to the list size. Adding a value to a list
+     * shifts any existing elements at or above the specified index to the right by one.
+     *
+     * @param key the {@code Map} key or {@code List} index to add.
+     * @param object the Java object to add.
+     * @throws JsonValueException if not a {@code Map} or {@code List}, the {@code Map} key already exists, or the {@code List} index is out of range.
      */
-    public int size() {
+    public void add(String key, Object object) throws JsonValueException {
         if (isMap()) {
-            return ((Map)value).size();
+            Map<String, Object> map = asMap();
+            if (map.containsKey(key)) {
+                throw new JsonValueException(this, "Map key " + key + " already exists");
+            }
+            map.put(key, object);
         } else if (isList()) {
-            return ((List)value).size();
+            add(toIndex(key), object);
         } else {
-            return 0;
+            throw new JsonValueException(this, "Expecting a Map or List");
         }
+    }
+
+    /**
+     * Adds the specified value to the list. Adding a value to a list shifts any existing
+     * elements at or above the specified index to the right by one.
+     *
+     * @param index the {@code List} index of the value to add.
+     * @param object the java object to add.
+     * @throws JsonValueException if this JSON value is not a {@code List} or index is out of range.
+     */
+    public void add(int index, Object object) throws JsonValueException {
+        List<Object> list = required().asList();
+        if (index < 0 || index > list.size()) {
+            throw new JsonValueException(this, "List index out of range: " + index);
+        }
+        list.add(index, object);
     }
 
     /**
@@ -793,7 +829,7 @@ public class JsonValue implements Iterable<JsonValue> {
         Set<String> result;
         if (isMap()) {
             result = new HashSet<String>();
-            for (Object key : ((Map)value).keySet()) {
+            for (Object key : asMap().keySet()) {
                 if (key instanceof String) {
                     result.add((String)key); // only expose string keys in map
                 }
@@ -808,18 +844,19 @@ public class JsonValue implements Iterable<JsonValue> {
 
     /**
      * Returns an iterator over the child values that this JSON value contains. If this value
-     * is a {@code Map}, then the order of the resulting child values is undefined.
+     * is a {@link Map}, then the order of the resulting child values is undefined.
+     * Calling the {@link Iterator#remove()} method of the returned iterator will throw a
+     * {@link UnsupportedOperationException}.
      * <p>
      * Note: calls to the {@code next()} method may throw the runtime {@link JsonException}
      * if any transformers fail to execute.
      */
     @Override
-    @SuppressWarnings("unchecked")
     public Iterator<JsonValue> iterator() {
         if (isList()) { // optimize for list
             return new Iterator<JsonValue>() {
                 int cursor = 0;
-                Iterator<Object> i = ((List)value).iterator();
+                Iterator<Object> i = asList().iterator();
                 @Override public boolean hasNext() {
                     return i.hasNext();
                 }
@@ -852,29 +889,36 @@ public class JsonValue implements Iterable<JsonValue> {
      * <p>
      * This method applies all transformations while traversing the values's children.
      * Consequently, the resulting copy does not inherit the transformers from this value.
+     * <p>
+     * Note: This method is recursive, and currently has no ability to detect or correct for
+     * structures containing cyclic references. Processing such a structure will result in a
+     * {@link StackOverflowError} being thrown.
      */
     public JsonValue copy() {
-        JsonValue result = new JsonValue(value, pointer); // start with shallow copy
+// TODO: track original values to resolve cyclic references
+        JsonValue result = new JsonValue(object, pointer); // start with shallow copy
         if (isMap()) {
             HashMap<String, Object> map = new HashMap<String, Object>(size());
             for (String key : keys()) {
-                map.put(key, get(key).copy().getValue()); // recursive descent
+                map.put(key, get(key).copy().getObject()); // recursion
             }
-            result.value = map;
+            result.object = map;
         } else if (isList()) {
             ArrayList<Object> list = new ArrayList<Object>(size());
             for (JsonValue element : this) {
-                list.add(element.copy().getValue()); // recursive descent
+                list.add(element.copy().getObject()); // recursion
             }
-            result.value = list;
+            result.object = list;
         }
         return result;
     }
 
     /**
-     * Returns a string representation of the JSON value. This method does not apply
-     * transformations to the value's children.
+     * Returns a string representation of the JSON value. The result resembles—but is not
+     * guaranteed to conform to—JSON syntax. This method does not apply transformations to
+     * the value's children.
      */ 
+    @SuppressWarnings("unchecked")
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
@@ -882,11 +926,11 @@ public class JsonValue implements Iterable<JsonValue> {
             sb.append("null");
         } else if (isMap()) {
             sb.append("{ ");
-            Map<String, Object> map = asMap();
-            for (Iterator<String> i = map.keySet().iterator(); i.hasNext();) {
-                String key = i.next();
-                sb.append('"').append(key).append("\": ");
-                sb.append(new JsonValue(map.get(key)).toString()); // recursive
+            Map<Object, Object> map = (Map)object;
+            for (Iterator<Object> i = map.keySet().iterator(); i.hasNext();) {
+                Object key = i.next();
+                sb.append('"').append(key.toString()).append("\": ");
+                sb.append(new JsonValue(map.get(key)).toString()); // recursion
                 if (i.hasNext()) {
                     sb.append(", ");
                 }
@@ -894,17 +938,17 @@ public class JsonValue implements Iterable<JsonValue> {
             sb.append(" }");
         } else if (isList()) {
             sb.append("[ ");
-            for (Iterator<Object> i = asList().iterator(); i.hasNext();) {
-                sb.append(new JsonValue(i.next()).toString()); // recursive
+            for (Iterator<Object> i = ((List)object).iterator(); i.hasNext();) {
+                sb.append(new JsonValue(i.next()).toString()); // recursion
                 if (i.hasNext()) {
                     sb.append(", ");
                 }
             }
             sb.append(" ]");
         } else if (isString()) {
-            sb.append('"').append(value).append('"');
+            sb.append('"').append(object).append('"');
         } else {
-            sb.append(value);
+            sb.append(object.toString());
         }
         return sb.toString();
     }

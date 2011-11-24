@@ -17,7 +17,7 @@
 
 package org.forgerock.json.fluent;
 
-// Java Standard Edition
+// Java SE
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

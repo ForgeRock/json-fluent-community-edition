@@ -16,7 +16,7 @@
 
 package org.forgerock.json.fluent;
 
-// Java Standard Edition
+// Java SE
 import java.io.Serializable;
 import java.util.AbstractSet;
 import java.util.Iterator;

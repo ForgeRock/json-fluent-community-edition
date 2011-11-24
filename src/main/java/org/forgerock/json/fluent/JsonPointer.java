@@ -16,7 +16,7 @@
 
 package org.forgerock.json.fluent;
 
-// Java Standard Edition
+// Java SE
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;

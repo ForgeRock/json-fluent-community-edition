@@ -17,7 +17,7 @@
 
 package org.forgerock.json.fluent;
 
-// Java Standard Edition
+// Java SE
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -66,8 +66,8 @@ public class JsonValueTest {
     public void getArrayPointer() {
         listValue.put(0, "x");
         listValue.put(1, "y");
-        assertThat(listValue.get(new JsonPointer("/0")).getValue()).isEqualTo("x");
-        assertThat(listValue.get(new JsonPointer("/1")).getValue()).isEqualTo("y");
+        assertThat(listValue.get(new JsonPointer("/0")).getObject()).isEqualTo("x");
+        assertThat(listValue.get(new JsonPointer("/1")).getObject()).isEqualTo("y");
     }
 
     @Test
@@ -89,10 +89,10 @@ public class JsonValueTest {
         mapValue.get("a").put(1, new ArrayList<Object>());
         mapValue.get("a").get(1).put(0, "a10");
         mapValue.get("a").get(1).put(1, "a11");
-        assertThat(mapValue.get(new JsonPointer("/a/0/0")).getValue()).isEqualTo("a00");
-        assertThat(mapValue.get(new JsonPointer("/a/0/1")).getValue()).isEqualTo("a01");
-        assertThat(mapValue.get(new JsonPointer("/a/1/0")).getValue()).isEqualTo("a10");
-        assertThat(mapValue.get(new JsonPointer("/a/1/1")).getValue()).isEqualTo("a11");
+        assertThat(mapValue.get(new JsonPointer("/a/0/0")).getObject()).isEqualTo("a00");
+        assertThat(mapValue.get(new JsonPointer("/a/0/1")).getObject()).isEqualTo("a01");
+        assertThat(mapValue.get(new JsonPointer("/a/1/0")).getObject()).isEqualTo("a10");
+        assertThat(mapValue.get(new JsonPointer("/a/1/1")).getObject()).isEqualTo("a11");
     }
 
     @Test
@@ -128,18 +128,18 @@ public class JsonValueTest {
         mapValue.add("keyE", mapObject2);
 
         mapValue.put(new JsonPointer("/keyA"), "testValueA");
-        assertThat(mapValue.get(new JsonPointer("/keyA")).getValue()).isEqualTo("testValueA");
+        assertThat(mapValue.get(new JsonPointer("/keyA")).getObject()).isEqualTo("testValueA");
 
         listValue.put(new JsonPointer("/1"), "testValueA");
-        assertThat(listValue.get(new JsonPointer("/1")).getValue()).isEqualTo("testValueA");
+        assertThat(listValue.get(new JsonPointer("/1")).getObject()).isEqualTo("testValueA");
 
         mapValue.put(new JsonPointer("/keyD/0"), "testValueD");
-        assertThat(mapValue.get(new JsonPointer("/keyD/0")).getValue()).isEqualTo("testValueD");
+        assertThat(mapValue.get(new JsonPointer("/keyD/0")).getObject()).isEqualTo("testValueD");
 
         mapValue.put(new JsonPointer("/keyE/keyH"), "testValueH");
-        assertThat(mapValue.get(new JsonPointer("/keyE/keyH")).getValue()).isEqualTo("testValueH");
+        assertThat(mapValue.get(new JsonPointer("/keyE/keyH")).getObject()).isEqualTo("testValueH");
 
         mapValue.put(new JsonPointer("/keyE/keyJ/keyF/2"), "testValueH");
-        assertThat(mapValue.get(new JsonPointer("/keyE/keyJ/keyF/2")).getValue()).isEqualTo("testValueH");
+        assertThat(mapValue.get(new JsonPointer("/keyE/keyJ/keyF/2")).getObject()).isEqualTo("testValueH");
     }
 }
