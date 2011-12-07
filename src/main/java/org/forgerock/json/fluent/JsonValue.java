@@ -24,6 +24,7 @@ import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.nio.charset.UnsupportedCharsetException;
+import java.util.AbstractSet;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -36,6 +37,9 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
+
+// Utilities
+import org.forgerock.util.RangeSet;
 
 /**
  * Represents a value in a JSON object model structure. JSON values are represented with
@@ -94,9 +98,6 @@ public class JsonValue implements Iterable<JsonValue> {
     Collection<? extends JsonTransformer> transformers) throws JsonException {
         this.object = object;
         this.pointer = pointer;
-        if (transformers != null) {
-            this.transformers.addAll(transformers);
-        }
         JsonValue jv = unwrapObject(object);
         if (jv != null) {
             this.object = jv.object;
@@ -107,10 +108,13 @@ public class JsonValue implements Iterable<JsonValue> {
                 this.transformers.addAll(jv.transformers);
             }
         }
+        if (transformers != null) {
+            this.transformers.addAll(transformers);
+        }
         if (this.pointer == null) {
             this.pointer = new JsonPointer();
         }
-        if (transformers != null) {
+        if (this.transformers.size() > 0) {
             applyTransformers();
         }
     }
@@ -179,8 +183,8 @@ public class JsonValue implements Iterable<JsonValue> {
      * the new value.
      * <p>
      * This method will automatically unwrap any {@link JsonValueWrapper} and/or
-     * {@link JsonValue} objects. Neither the pointer nor the transformers are inherited from
-     * the wrapped value. No transformers are applied to the wrapped value's items. 
+     * {@link JsonValue} objects. Transformers are inherited from the wrapped value.
+     * This value's pointer remains unaffected.
      *
      * @param object the object to set.
      */
@@ -189,6 +193,7 @@ public class JsonValue implements Iterable<JsonValue> {
         JsonValue jv = unwrapObject(object);
         if (jv != null) {
             this.object = jv.object;
+            this.transformers.addAll(jv.transformers);
         }
     }
 
@@ -834,8 +839,38 @@ public class JsonValue implements Iterable<JsonValue> {
                     result.add((String)key); // only expose string keys in map
                 }
             }
-        } else if (isList() && size() > 0) {
-            result = new RangeSet(0, size() - 1);
+        } else if (isList()) {
+            result = new AbstractSet<String>() {
+                RangeSet range = new RangeSet(size()); // 0 through size-1 inclusive
+                @Override public int size() {
+                    return range.size();
+                }
+                @Override public boolean contains(Object o) {
+                    boolean result = false;
+                    if (o instanceof String) {
+                        try {
+                            result = range.contains(Integer.valueOf((String)o));
+                        } catch (NumberFormatException nfe) {
+                            // ignore; yields false
+                        }
+                    }
+                    return result;
+                }
+                @Override public Iterator<String> iterator() {
+                    return new Iterator<String>() {
+                        Iterator i = range.iterator();
+                        @Override public boolean hasNext() {
+                            return i.hasNext();
+                        }
+                        @Override public String next() {
+                            return i.next().toString();
+                        }
+                        @Override public void remove() {
+                            throw new UnsupportedOperationException();
+                        }
+                    };
+                }
+            };
         } else {
             result = Collections.emptySet();
         }
