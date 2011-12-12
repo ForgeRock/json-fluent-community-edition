@@ -72,10 +72,10 @@ public class JsonValue implements Iterable<JsonValue> {
      */
     private JsonValue unwrapObject(Object object) {
         JsonValue result = null;
-        if (object instanceof JsonValueWrapper) {
+        if (object != null && object instanceof JsonValueWrapper) {
             object = ((JsonValueWrapper)object).unwrap();
         }
-        if (object instanceof JsonValue) {
+        if (object != null && object instanceof JsonValue) {
             result = (JsonValue)object;
         }
         return result;
@@ -462,7 +462,7 @@ public class JsonValue implements Iterable<JsonValue> {
             }
             if (result == null) {
                 StringBuilder sb = new StringBuilder("Expecting String containing one of:");
-                for (T constant :constants) {
+                for (T constant : constants) {
                     sb.append(' ').append(constant.toString());
                 }
             }
