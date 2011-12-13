@@ -37,6 +37,7 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
+import java.util.UUID;
 
 // Utilities
 import org.forgerock.util.RangeSet;
@@ -55,7 +56,7 @@ import org.forgerock.util.RangeSet;
  *
  * @author Paul C. Bryan
  */
-public class JsonValue implements Iterable<JsonValue> {
+public class JsonValue implements Cloneable, Iterable<JsonValue> {
 
     /** Transformers to apply to the value; are inherited by its members. */
     private final ArrayList<JsonTransformer> transformers = new ArrayList<JsonTransformer>();
@@ -545,6 +546,21 @@ public class JsonValue implements Iterable<JsonValue> {
     }
 
     /**
+     * Returns the JSON string value as a universally unique identifier (UUID). If the
+     * JSON value is {@code null}, this method returns {@code null}.
+     *
+     * @return the UUID represented by the JSON value string.
+     * @throws JsonValueException if the JSON value is not a string or valid UUID.
+     */
+    public UUID asUUID() throws JsonValueException {
+        try {
+            return (object == null ? null : UUID.fromString(asString()));
+        } catch (IllegalArgumentException iae) {
+            throw new JsonValueException(this, iae);
+        }
+    }
+
+    /**
      * Defaults the JSON value to the specified value if it is currently {@code null}.
      *
      * @param object the object to default to.
@@ -922,8 +938,9 @@ public class JsonValue implements Iterable<JsonValue> {
     /**
      * Returns a deep copy of this JSON value.
      * <p>
-     * This method applies all transformations while traversing the values's children.
-     * Consequently, the resulting copy does not inherit the transformers from this value.
+     * This method applies all transformations while traversing the values's members and
+     * their members, and so on. Consequently, the returned copy does not include the
+     * transformers from this value.
      * <p>
      * Note: This method is recursive, and currently has no ability to detect or correct for
      * structures containing cyclic references. Processing such a structure will result in a
@@ -932,10 +949,10 @@ public class JsonValue implements Iterable<JsonValue> {
     public JsonValue copy() {
 // TODO: track original values to resolve cyclic references
         JsonValue result = new JsonValue(object, pointer); // start with shallow copy
-        if (isMap()) {
+        if (this.isMap()) {
             HashMap<String, Object> map = new HashMap<String, Object>(size());
             for (String key : keys()) {
-                map.put(key, get(key).copy().getObject()); // recursion
+                map.put(key, this.get(key).copy().getObject()); // recursion
             }
             result.object = map;
         } else if (isList()) {
@@ -944,6 +961,30 @@ public class JsonValue implements Iterable<JsonValue> {
                 list.add(element.copy().getObject()); // recursion
             }
             result.object = list;
+        }
+        return result;
+    }
+
+    /**
+     * Returns a shallow copy of this JSON value. If this JSON value contains a {@code Map}
+     * or a {@code List} object, the returned JSON value will contain a shallow copy of the
+     * original contained object.
+     * <p>
+     * The new value's members can be modified without affecting the original value.
+     * Modifying the member's members will almost certainly affect the original value. To
+     * avoid this, use the {@link #copy} method to return a deep copy of the JSON value.
+     * <p>
+     * This method does not traverse the value's members, nor will it apply any
+     * transformations.
+     */
+    @Override
+    public JsonValue clone() {
+        JsonValue result = new JsonValue(this.object, this.pointer);
+        result.transformers.addAll(this.transformers); // avoid re-applying transformers
+        if (isMap()) {
+            result.object = new HashMap<String, Object>(this.asMap());
+        } else if (isList()) {
+            result.object = new ArrayList<Object>(this.asList());
         }
         return result;
     }
