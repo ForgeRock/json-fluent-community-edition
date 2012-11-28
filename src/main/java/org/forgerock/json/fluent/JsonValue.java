@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -950,7 +951,12 @@ public class JsonValue implements Cloneable, Iterable<JsonValue> {
 // TODO: track original values to resolve cyclic references
         JsonValue result = new JsonValue(object, pointer); // start with shallow copy
         if (this.isMap()) {
-            HashMap<String, Object> map = new HashMap<String, Object>(size());
+            Map<String, Object> map = null;
+            if (this.getObject() instanceof LinkedHashMap) {
+                map = new LinkedHashMap<String, Object>(size());
+            } else {
+                map = new HashMap<String, Object>(size());
+            }
             for (String key : keys()) {
                 map.put(key, this.get(key).copy().getObject()); // recursion
             }
