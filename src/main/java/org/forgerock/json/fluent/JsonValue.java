@@ -29,18 +29,16 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
-import java.util.UUID;
 
-// Utilities
 import org.forgerock.util.RangeSet;
 
 /**
@@ -850,7 +848,7 @@ public class JsonValue implements Cloneable, Iterable<JsonValue> {
     public Set<String> keys() {
         Set<String> result;
         if (isMap()) {
-            result = new HashSet<String>();
+            result = new LinkedHashSet<String>();
             for (Object key : asMap().keySet()) {
                 if (key instanceof String) {
                     result.add((String)key); // only expose string keys in map
